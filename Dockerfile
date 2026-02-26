@@ -56,8 +56,7 @@ COPY packages/dashboard/package.json packages/dashboard/
 RUN npm ci --omit=dev
 
 # tsx is needed at runtime for pipeline scripts (compiles TS on the fly)
-# drizzle-kit is needed for database migrations (migrate entrypoint mode)
-RUN npm install -g tsx drizzle-kit
+RUN npm install -g tsx
 
 # Copy TypeScript source files (tsx needs them for pipeline scripts)
 COPY packages/shared/src packages/shared/src
