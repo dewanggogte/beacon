@@ -1,0 +1,77 @@
+{
+  "name": "Graham Defensive Investor Screen",
+  "version": "1.0.0",
+  "description": "10 criteria from Benjamin Graham's The Intelligent Investor — defensive investor approach",
+  "criteria": [
+    {
+      "id": "adequate_size",
+      "name": "Adequate Size",
+      "description": "Market Cap > 5,000 Crores",
+      "threshold": "Market Cap > 5000 Cr",
+      "weight": 8
+    },
+    {
+      "id": "current_ratio",
+      "name": "Current Ratio",
+      "description": "Current ratio >= 2.0 (proxy from balance sheet)",
+      "threshold": ">= 2.0",
+      "weight": 10
+    },
+    {
+      "id": "net_current_assets",
+      "name": "Net Current Assets > Long-term Debt",
+      "description": "Net current asset value exceeds long-term borrowings",
+      "threshold": "NCAV > Borrowings",
+      "weight": 10
+    },
+    {
+      "id": "positive_earnings",
+      "name": "Positive Earnings",
+      "description": "Positive earnings in all available years (up to 10)",
+      "threshold": "all years positive",
+      "weight": 12
+    },
+    {
+      "id": "dividend_continuity",
+      "name": "Dividend Continuity",
+      "description": "Dividend paid in all available years",
+      "threshold": "all years paid",
+      "weight": 8
+    },
+    {
+      "id": "eps_growth",
+      "name": "EPS Growth",
+      "description": "EPS growth >= 33% over 10 years (comparing 3-year average endpoints)",
+      "threshold": ">= 33% over 10yr",
+      "weight": 12
+    },
+    {
+      "id": "pe_ratio",
+      "name": "P/E Ratio",
+      "description": "Current P/E < 15",
+      "threshold": "< 15",
+      "weight": 12
+    },
+    {
+      "id": "pb_ratio",
+      "name": "P/B Ratio",
+      "description": "Current P/B < 1.5",
+      "threshold": "< 1.5",
+      "weight": 10
+    },
+    {
+      "id": "pe_pb_product",
+      "name": "P/E x P/B Product",
+      "description": "P/E multiplied by P/B < 22.5",
+      "threshold": "< 22.5",
+      "weight": 10
+    },
+    {
+      "id": "price_vs_graham",
+      "name": "Price < Graham Number",
+      "description": "Current price below Graham Number (sqrt(22.5 * EPS * BV))",
+      "threshold": "price < Graham Number",
+      "weight": 8
+    }
+  ]
+}

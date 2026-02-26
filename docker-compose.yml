@@ -1,0 +1,58 @@
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: screener
+      POSTGRES_USER: screener
+      POSTGRES_PASSWORD: screener-dev-password
+    ports:
+      - "5433:5432"
+    volumes:
+      - screener-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U screener -d screener"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  dashboard:
+    build: .
+    command: ["dashboard"]
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: postgresql://screener:screener-dev-password@db:5432/screener
+      NODE_ENV: production
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # Run the pipeline as a one-off:
+  #   docker compose run --rm pipeline
+  pipeline:
+    build: .
+    command: ["pipeline"]
+    environment:
+      DATABASE_URL: postgresql://screener:screener-dev-password@db:5432/screener
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+    depends_on:
+      db:
+        condition: service_healthy
+    profiles:
+      - pipeline
+
+  # Run database migrations:
+  #   docker compose run --rm migrate
+  migrate:
+    build: .
+    command: ["migrate"]
+    environment:
+      DATABASE_URL: postgresql://screener:screener-dev-password@db:5432/screener
+    depends_on:
+      db:
+        condition: service_healthy
+    profiles:
+      - tools
+
+volumes:
+  screener-pgdata:

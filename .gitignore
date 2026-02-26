@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.next/
+*.tsbuildinfo
+.env
+.env.local
+chrome-profile/
+logs/
+reports/*.md
+!reports/.gitkeep
+secrets/
+.DS_Store

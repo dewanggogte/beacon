@@ -1,0 +1,81 @@
+{
+  "name": "Peter Lynch Classification & Evaluation",
+  "version": "1.0.0",
+  "description": "Classify stocks into 6 categories and evaluate with category-specific criteria",
+  "classificationOrder": [
+    "turnaround",
+    "asset_play",
+    "cyclical",
+    "slow_grower",
+    "fast_grower",
+    "stalwart"
+  ],
+  "classificationRules": {
+    "turnaround": {
+      "description": "Net loss in latest year OR profit decline >30% from 3yr avg, AND was profitable 3+ of prior 7 years"
+    },
+    "asset_play": {
+      "description": "P/B < 0.5 OR (Investments + total assets value) significantly exceed market cap"
+    },
+    "cyclical": {
+      "description": "Sector in cyclical list AND earnings coefficient of variation > 0.5"
+    },
+    "slow_grower": {
+      "description": "Revenue CAGR 5Y < 5%, Market Cap > 20,000 Cr, Dividend Yield > 2%"
+    },
+    "fast_grower": {
+      "description": "Revenue CAGR 5Y > 15% AND Profit CAGR 5Y > 15%"
+    },
+    "stalwart": {
+      "description": "Default — everything that doesn't fit above categories"
+    }
+  },
+  "categoryScoring": {
+    "fast_grower": {
+      "criteria": [
+        { "id": "peg", "name": "PEG Ratio", "weight": 40, "description": "PEG < 1.0 ideal" },
+        { "id": "earnings_sustainability", "name": "Earnings Growth Sustainability", "weight": 30 },
+        { "id": "institutional_entry", "name": "Institutional Entry", "weight": 15 },
+        { "id": "margin_trajectory", "name": "Margin Trajectory", "weight": 15 }
+      ]
+    },
+    "stalwart": {
+      "criteria": [
+        { "id": "peg", "name": "PEG Ratio", "weight": 25, "description": "PEG < 1.5 ideal" },
+        { "id": "margin_stability", "name": "Margin Stability", "weight": 25 },
+        { "id": "dividend_growth", "name": "Dividend Growth", "weight": 25 },
+        { "id": "reasonable_pe", "name": "Reasonable P/E", "weight": 25 }
+      ]
+    },
+    "cyclical": {
+      "criteria": [
+        { "id": "earnings_cycle_position", "name": "Earnings Cycle Position", "weight": 40 },
+        { "id": "de_ratio", "name": "D/E Ratio", "weight": 25 },
+        { "id": "momentum", "name": "Momentum", "weight": 20 },
+        { "id": "sector_timing", "name": "Sector Timing", "weight": 15 }
+      ]
+    },
+    "turnaround": {
+      "criteria": [
+        { "id": "cash_debt_coverage", "name": "Cash/Debt Coverage", "weight": 35 },
+        { "id": "ocf_trend", "name": "OCF Trend", "weight": 25 },
+        { "id": "margin_recovery", "name": "Margin Recovery", "weight": 20 },
+        { "id": "management_signals", "name": "Management Signals", "weight": 20 }
+      ]
+    },
+    "slow_grower": {
+      "criteria": [
+        { "id": "dividend_yield", "name": "Dividend Yield vs Bond Yield", "weight": 40 },
+        { "id": "payout_sustainability", "name": "Payout Sustainability", "weight": 30 },
+        { "id": "not_shrinking", "name": "Not Shrinking", "weight": 30 }
+      ]
+    },
+    "asset_play": {
+      "criteria": [
+        { "id": "asset_coverage", "name": "Asset Coverage vs Market Cap", "weight": 50 },
+        { "id": "catalyst_proximity", "name": "Catalyst Proximity", "weight": 30 },
+        { "id": "governance", "name": "Governance", "weight": 20 }
+      ]
+    }
+  }
+}

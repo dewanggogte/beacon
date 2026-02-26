@@ -1,0 +1,11 @@
+{
+  "description": "Framework weight matrix by Lynch category for composite scoring v2",
+  "weights": {
+    "fast_grower":  { "buffett": 0.20, "graham": 0.10, "lynch": 0.30, "pabrai": 0.20, "dimensions": 0.20 },
+    "stalwart":     { "buffett": 0.30, "graham": 0.20, "lynch": 0.15, "pabrai": 0.20, "dimensions": 0.15 },
+    "slow_grower":  { "buffett": 0.15, "graham": 0.30, "lynch": 0.15, "pabrai": 0.20, "dimensions": 0.20 },
+    "cyclical":     { "buffett": 0.10, "graham": 0.10, "lynch": 0.35, "pabrai": 0.25, "dimensions": 0.20 },
+    "turnaround":   { "buffett": 0.15, "graham": 0.10, "lynch": 0.15, "pabrai": 0.35, "dimensions": 0.25 },
+    "asset_play":   { "buffett": 0.10, "graham": 0.35, "lynch": 0.10, "pabrai": 0.25, "dimensions": 0.20 }
+  }
+}

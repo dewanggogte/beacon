@@ -1,0 +1,49 @@
+{
+  "name": "Pabrai Risk Screen",
+  "version": "1.0.0",
+  "description": "6 risk factors from Mohnish Pabrai's investing framework — heads I win, tails I don't lose much",
+  "factors": [
+    {
+      "id": "de_ratio",
+      "name": "D/E Ratio",
+      "weight": 25,
+      "description": "0 ideal, <0.5 safe, >1 risky",
+      "thresholds": { "excellent": 0, "good": 0.3, "acceptable": 0.5, "risky": 1.0, "dangerous": 2.0 }
+    },
+    {
+      "id": "interest_coverage",
+      "name": "Interest Coverage",
+      "weight": 20,
+      "description": ">5x safe, >3x adequate",
+      "thresholds": { "excellent": 10, "good": 5, "acceptable": 3, "risky": 1.5, "dangerous": 1.0 }
+    },
+    {
+      "id": "debt_repayment",
+      "name": "Debt Repayment Timeline",
+      "weight": 15,
+      "description": "Total debt / OCF < 3 years",
+      "thresholds": { "excellent": 1, "good": 2, "acceptable": 3, "risky": 5, "dangerous": 10 }
+    },
+    {
+      "id": "promoter_pledge",
+      "name": "Promoter Pledge",
+      "weight": 15,
+      "description": "0% ideal, any pledge is a negative signal",
+      "thresholds": { "excellent": 0, "good": 0, "acceptable": 10, "risky": 30, "dangerous": 50 }
+    },
+    {
+      "id": "ocf_predictability",
+      "name": "OCF Predictability",
+      "weight": 15,
+      "description": "Positive 5/5 years + low variance",
+      "thresholds": { "excellent": 5, "good": 4, "acceptable": 3, "risky": 2, "dangerous": 1 }
+    },
+    {
+      "id": "revenue_stability",
+      "name": "Revenue Stability",
+      "weight": 10,
+      "description": "Low coefficient of variation = simpler business",
+      "thresholds": { "excellent": 0.1, "good": 0.2, "acceptable": 0.35, "risky": 0.5, "dangerous": 0.8 }
+    }
+  ]
+}

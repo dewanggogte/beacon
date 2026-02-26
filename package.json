@@ -1,0 +1,33 @@
+{
+  "name": "screener-automation",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "packages/shared",
+    "packages/scraper",
+    "packages/analyzer",
+    "packages/dashboard"
+  ],
+  "scripts": {
+    "build": "tsc --build tsconfig.build.json",
+    "clean": "tsc --build --clean tsconfig.build.json",
+    "typecheck": "tsc --build tsconfig.build.json",
+    "scraper": "npm run dev -w @screener/scraper",
+    "scraper:test": "npm run scrape:test -w @screener/scraper",
+    "analyzer": "npm run dev -w @screener/analyzer",
+    "dashboard": "npm run dev -w @screener/dashboard",
+    "pipeline": "npx tsx scripts/run-pipeline.ts",
+    "pipeline:scrape": "npx tsx scripts/run-pipeline.ts --scrape-only",
+    "pipeline:analyze": "npx tsx scripts/run-pipeline.ts --analyze-only",
+    "pipeline:quick": "npx tsx scripts/run-pipeline.ts --skip-llm",
+    "db:generate": "npm run db:generate -w @screener/shared",
+    "db:migrate": "npm run db:migrate -w @screener/shared",
+    "db:studio": "npm run db:studio -w @screener/shared"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0"
+  }
+}

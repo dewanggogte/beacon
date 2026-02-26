@@ -1,0 +1,22 @@
+{
+  "name": "@screener/scraper",
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/index.ts",
+    "scrape": "tsx src/index.ts scrape",
+    "scrape:test": "tsx src/index.ts scrape --limit 10",
+    "list": "tsx src/index.ts list",
+    "test:single": "tsx src/index.ts test"
+  },
+  "dependencies": {
+    "@screener/shared": "*",
+    "cheerio": "^1.0.0",
+    "p-limit": "^6.0.0",
+    "zod": "^3.24.0"
+  },
+  "devDependencies": {
+    "playwright": "^1.50.0"
+  }
+}
