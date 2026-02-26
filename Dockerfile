@@ -19,10 +19,13 @@ FROM node:22-slim AS builder
 WORKDIR /app
 
 COPY --from=deps /app/node_modules ./node_modules
-COPY --from=deps /app/packages/shared/node_modules ./packages/shared/node_modules 2>/dev/null || true
-COPY --from=deps /app/packages/scraper/node_modules ./packages/scraper/node_modules 2>/dev/null || true
-COPY --from=deps /app/packages/analyzer/node_modules ./packages/analyzer/node_modules 2>/dev/null || true
-COPY --from=deps /app/packages/dashboard/node_modules ./packages/dashboard/node_modules 2>/dev/null || true
+RUN mkdir -p packages/shared packages/scraper packages/analyzer packages/dashboard
+COPY --from=deps /app/packages/ /tmp/deps-packages/
+RUN for pkg in shared scraper analyzer dashboard; do \
+      if [ -d "/tmp/deps-packages/$pkg/node_modules" ]; then \
+        cp -r "/tmp/deps-packages/$pkg/node_modules" "packages/$pkg/node_modules"; \
+      fi; \
+    done && rm -rf /tmp/deps-packages
 
 # Copy all source code
 COPY . .
