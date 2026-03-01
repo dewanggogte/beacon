@@ -9,4 +9,6 @@ logs/
 reports/*.md
 !reports/.gitkeep
 secrets/
+OPS.md
+docs/
 .DS_Store

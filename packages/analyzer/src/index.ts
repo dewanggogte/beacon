@@ -246,4 +246,10 @@ switch (command) {
     console.log('  --to=DATE            End date (YYYY-MM-DD)');
     console.log('  --top=<n>            Top N picks per period (default: 20)');
     console.log('  --days=<n>           Holding period in days (default: 180)');
+    console.log('');
+    console.log('Environment variables (LLM):');
+    console.log('  LLM_PROVIDER         "anthropic" (default) or "local"');
+    console.log('  LOCAL_LLM_URL        Base URL for local model (default: http://192.168.0.42:8000)');
+    console.log('  LOCAL_LLM_MODEL      Model name for local endpoint (default: qwen3.5-35b-a3b)');
+    console.log('  LOCAL_LLM_TEMPERATURE Temperature for local model (default: 0.7, Qwen recommends 0.7)');
 }

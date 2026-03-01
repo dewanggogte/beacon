@@ -34,6 +34,12 @@ Red flags to look for in Pros/Cons text:
 4. Scan pros/cons for governance red flags
 5. Consider the overall governance picture
 
+ANALYSIS CHAIN (follow this order in your reasoning field):
+1. PROMOTER: Is the promoter accumulating, maintaining, or divesting? Any pledge risk?
+2. INSTITUTIONS: Are FIIs/DIIs accumulating or exiting? What signal does this send?
+3. RED FLAGS: Any governance red flags in pros/cons or shareholding patterns?
+4. VERDICT: Net governance risk level and direction.
+
 CRITICAL RULES:
 - ALWAYS cite specific shareholding percentages and quarter-over-quarter changes
 - Do not speculate — only use the data provided

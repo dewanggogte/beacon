@@ -15,6 +15,28 @@ function fmtSeries(values: (number | null)[], maxLen = 10, decimals = 0): string
   return slice.map((v) => v !== null ? v.toFixed(decimals) : 'N/A').join(', ');
 }
 
+function formatPeerComparison(peers: Record<string, unknown>[] | null): string {
+  if (!peers || peers.length === 0) return '';
+  const top5 = peers.slice(0, 5);
+  const header = 'Name | CMP | P/E | Mar Cap (Cr) | ROCE% | Div Yld%';
+  const sep = '---|---|---|---|---|---';
+  const rows = top5.map((p) => {
+    const name = String(p['Name'] ?? p['name'] ?? 'N/A');
+    const cmp = String(p['CMP'] ?? p['cmp'] ?? 'N/A');
+    const pe = String(p['P/E'] ?? p['pe'] ?? 'N/A');
+    const mcap = String(p['Mar Cap'] ?? p['marCap'] ?? p['Mar Cap.'] ?? 'N/A');
+    const roce = String(p['ROCE'] ?? p['roce'] ?? 'N/A');
+    const divYld = String(p['Div Yld'] ?? p['divYld'] ?? p['Div Yld.'] ?? 'N/A');
+    return `${name} | ${cmp} | ${pe} | ${mcap} | ${roce} | ${divYld}`;
+  });
+  return `\n<peer_comparison>
+Top peers in sector:
+${header}
+${sep}
+${rows.join('\n')}
+</peer_comparison>`;
+}
+
 function fmtCriteria(criteria: { name: string; passed: boolean; value: number | null; threshold: string; detail?: string }[]): string {
   return criteria.map((c) => {
     const status = c.passed ? 'PASS' : 'FAIL';
@@ -78,6 +100,7 @@ Revenue CAGR 5Y: ${enriched.revenueCagr5Y !== null ? (enriched.revenueCagr5Y * 1
 Pros: ${enriched.pros.length > 0 ? enriched.pros.map((p) => `\n- ${p}`).join('') : 'None'}
 Cons: ${enriched.cons.length > 0 ? enriched.cons.map((c) => `\n- ${c}`).join('') : 'None'}
 </screener_signals>
+${formatPeerComparison(enriched.peerComparison)}
 </company_data>`;
 }
 
@@ -161,7 +184,15 @@ export function buildSynthesisDataPack(
   fundamentalsOutput: string,
   governanceOutput: string,
   riskOutput: string,
+  regimeContext?: { regime: string; confidence: string; signals: string[] } | null,
 ): string {
+  const macroSection = regimeContext
+    ? `\n<macro_environment>
+Current Regime: ${regimeContext.regime} (${regimeContext.confidence} confidence)
+Signals: ${regimeContext.signals.join('; ')}
+</macro_environment>`
+    : '';
+
   return `<company_data>
 Company: ${analysis.companyName} (${analysis.screenerCode})
 Sector: ${enriched.sector}
@@ -183,6 +214,7 @@ Pabrai Risk: ${fr.pabrai.riskScore}/100 (${fr.pabrai.overallRisk})
 Market Cap: ${fmt(enriched.marketCap, 0)} Cr | P/E: ${fmt(enriched.stockPe)} | P/B: ${fmt(enriched.pbRatio, 2)}
 ROCE: ${fmt(enriched.roce)}% | ROE: ${fmt(enriched.roe)}%
 </current_metrics>
+${formatPeerComparison(enriched.peerComparison)}${macroSection}
 </company_data>
 
 <analyst_reports>

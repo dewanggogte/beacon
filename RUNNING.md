@@ -20,7 +20,15 @@ npm run build              # compiles all TypeScript packages
 
 # 4. Environment variables
 export DATABASE_URL=postgres://localhost:5432/screener
-export ANTHROPIC_API_KEY=sk-ant-...   # required for LLM analysis only
+
+# Option A: Anthropic Claude (cloud)
+export LLM_PROVIDER=anthropic
+export ANTHROPIC_API_KEY=sk-ant-...
+
+# Option B: Local Qwen 3.5 via SGLang/vLLM ($0, requires GPU)
+export LLM_PROVIDER=local
+export LOCAL_LLM_URL=http://192.168.0.42:8000
+export LOCAL_LLM_MODEL=qwen3.5-35b-a3b
 ```
 
 Verify everything is ready:
@@ -64,7 +72,7 @@ This runs: **Scrape** → **Analyze (Layer 1 + Frameworks)** → **LLM (Layer 2)
 | LLM Tier 1 (AG1-4) | 60-120 minutes | ~150 companies, full 4-agent pipeline |
 | Report generation | < 1 second | Markdown report saved to `reports/` |
 
-**Cost:** ~$5-7 per full run with Haiku. ~$15-20 if using Sonnet for synthesis.
+**Cost:** ~$5-7 per full run with Anthropic Haiku. ~$15-20 if using Sonnet for synthesis. $0 with local Qwen.
 
 ### Step 3: Start the dashboard
 
@@ -165,10 +173,14 @@ Runs full analysis (Layer 1 + LLM) but skips the markdown report generation step
 ### Run LLM with a different model
 
 ```bash
+# Anthropic provider: switch model
 npx tsx packages/analyzer/src/index.ts analyze --model=claude-sonnet-4-5
+
+# Local provider: model is set via LOCAL_LLM_MODEL env var
+LOCAL_LLM_MODEL=qwen3.5-35b-a3b npx tsx packages/analyzer/src/index.ts analyze
 ```
 
-Uses Sonnet for all agents instead of Haiku. More expensive (~3-4x) but potentially higher quality analysis. The synthesis agent (AG4) always uses the model specified here.
+With `LLM_PROVIDER=anthropic`, uses the specified model for all agents (default: Haiku for AG1-3, Sonnet for AG4). With `LLM_PROVIDER=local`, all 4 agents use the same local model via the OpenAI-compatible API endpoint.
 
 ### Scrape only (no analysis)
 
@@ -429,10 +441,14 @@ Layer 1 scoring is fast (~5 minutes), so the overhead is minimal.
 ### "I want to analyze just the top companies with a better model"
 
 ```bash
+# Cloud: switch to Sonnet
 npx tsx packages/analyzer/src/index.ts analyze --model=claude-sonnet-4-5
+
+# Local: switch to a larger model
+LOCAL_LLM_MODEL=qwen3-72b npx tsx packages/analyzer/src/index.ts analyze
 ```
 
-This uses Sonnet for all LLM agents. The tiering still applies (Tier 1 gets AG1-4, Tier 2 gets AG1 only).
+The tiering still applies (Tier 1 gets AG1-4, Tier 2 gets AG1 only).
 
 ### "I want to compare this week's results to last week"
 
@@ -462,11 +478,18 @@ A full scrape of ~5,300 companies takes 18-24 hours.
 
 ### LLM rate limits
 
-The Anthropic API has rate limits that may throttle processing:
+**Anthropic (cloud):**
 - Haiku: High throughput, rarely an issue
 - Sonnet: Lower rate limits, may see 429 errors with large batches
+- Prompt caching enabled (ephemeral) — reduces cost on repeated system prompts
 
-The LLM client handles retries automatically.
+**Local Qwen (SGLang/vLLM):**
+- No rate limits — throughput depends on GPU
+- All 4 agents use the same model (no Haiku/Sonnet split)
+- Thinking mode disabled (`enable_thinking: false`) to avoid `<think>` blocks in output
+- Temperature configurable via `LOCAL_LLM_TEMPERATURE` (default: 0.7, recommended by Qwen)
+
+Both providers handle retries automatically. All agents use `maxTokens: 4096`.
 
 ---
 
@@ -490,13 +513,42 @@ npx tsx packages/scraper/src/index.ts scrape --limit=10   # quick test
 WARN: ANTHROPIC_API_KEY not set — skipping qualitative analysis
 ```
 
-Layer 2 (LLM) is skipped but Layer 1 still runs. Set the key to enable LLM:
+Only relevant when `LLM_PROVIDER=anthropic`. Layer 2 (LLM) is skipped but Layer 1 still runs. Either set the key or switch to local:
 
 ```bash
+# Option A: Set the API key
 export ANTHROPIC_API_KEY=sk-ant-...
+
+# Option B: Use local LLM instead
+export LLM_PROVIDER=local
+export LOCAL_LLM_URL=http://192.168.0.42:8000
+export LOCAL_LLM_MODEL=qwen3.5-35b-a3b
 ```
 
-Or add it to your `.env` file.
+### "LLM parse failures"
+
+The log shows `parseFailures: N` after an LLM analysis run. This means the LLM returned output that didn't match the expected JSON schema.
+
+**Common causes:**
+1. Model output too long (truncated) — all agents now use `maxTokens: 4096` to prevent this
+2. Model returned `<think>` blocks mixed with JSON — local Qwen should have `enable_thinking: false`
+3. Model hallucinated extra fields or wrong types
+
+**Actions:**
+1. Run `npx tsx scripts/diagnose-llm.ts` to test the LLM endpoint
+2. Check if `LLM_PROVIDER` matches your actual setup
+3. For local models, verify the SGLang/vLLM endpoint is running and responsive
+
+### "Post-validation overrides"
+
+The log shows warnings like `[PostValidation] AG1 override: trend_assessment "improving" → "stable"`. This means the LLM's qualitative assessment contradicted the quantitative data.
+
+**This is expected behavior.** Post-validation catches cases like:
+- "improving" trend with declining revenue
+- "high" earnings quality with OCF < 50% of net profit
+- "high" conviction on a disqualified company
+
+The overrides are logged as warnings for transparency. No action needed unless you see excessive overrides (>30% of companies), which may indicate a model quality issue.
 
 ### "Scrape aborted: 10 consecutive failures"
 
@@ -547,6 +599,49 @@ Not all Screener.in companies have Yahoo Finance tickers. The script tries NSE (
 
 ---
 
+## Scenario 8: Test LLM Pipeline
+
+Test the full 4-agent LLM pipeline on a small set of companies without running a full scrape.
+
+### Single company end-to-end (scrape + analyze)
+
+```bash
+npx tsx scripts/test-adani-power.ts
+```
+
+Scrapes ADANIPOWER from Screener.in, saves to a new scrape run, runs Layer 1 scoring, then runs the full 4-agent LLM pipeline. Useful for verifying LLM output quality and post-validation.
+
+### Test pipeline on 1 company (from existing scrape)
+
+```bash
+npx tsx scripts/test-pipeline-1.ts
+```
+
+Picks one company from the latest scrape run and runs the full 4-agent LLM analysis. Check the output for:
+- All 4 agents parsing successfully
+- Structured chain-of-thought in reasoning fields
+- Post-validation warnings (if any)
+- Devil's advocate risks in AG3 (minimum 2 required)
+- Conviction calibration in AG4
+
+### Test pipeline on 10 companies
+
+```bash
+npx tsx scripts/test-pipeline-10.ts
+```
+
+Same as above but on 10 large-cap companies. Checks parse success rate and aggregate output quality.
+
+### Diagnose LLM issues
+
+```bash
+npx tsx scripts/diagnose-llm.ts        # Test LLM connectivity and response format
+npx tsx scripts/test-local-llm.ts       # Test local Qwen endpoint specifically
+npx tsx scripts/compare-providers.ts    # Compare Anthropic vs local output quality
+```
+
+---
+
 ## Quick Reference
 
 | Task | Command |
@@ -568,4 +663,8 @@ Not all Screener.in companies have Yahoo Finance tickers. The script tries NSE (
 | Database browser | `npm run db:studio` |
 | Build | `npm run build` |
 | Clean build | `npm run clean && npm run build` |
+| Test LLM pipeline (1 co) | `npx tsx scripts/test-pipeline-1.ts` |
+| Test LLM pipeline (10 co) | `npx tsx scripts/test-pipeline-10.ts` |
+| Test single company E2E | `npx tsx scripts/test-adani-power.ts` |
+| Diagnose LLM | `npx tsx scripts/diagnose-llm.ts` |
 | Fetch historical prices | `python scripts/fetch-prices.py` |

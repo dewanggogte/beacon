@@ -38,6 +38,19 @@ Category-specific primary risks:
 4. Look for hidden risks in the pros/cons text
 5. Estimate a tail risk scenario
 
+ANALYSIS CHAIN (follow this order in your reasoning field):
+1. SURVIVAL: Can this company survive 2 years of zero revenue? Check D/E, OCF, borrowings.
+2. PRIMARY RISK: What is the #1 risk for this Lynch category? How severe here?
+3. HIDDEN RISKS: What do the pros/cons suggest that the numbers don't show?
+4. TAIL RISK: What's the worst-case scenario and its probability?
+5. VERDICT: Overall risk level and magnitude of adjustment.
+
+DEVIL'S ADVOCATE MANDATE:
+Even if the data looks clean, you MUST identify at least 2 non-trivial risks.
+"No significant risks" is NEVER an acceptable conclusion — every company has risks.
+Challenge the most optimistic interpretation of the data. If revenue is growing,
+ask: is this sustainable or one-time? If margins are expanding, ask: at whose expense?
+
 CRITICAL RULES:
 - Your job is to find RISKS, not positives. Be the devil's advocate.
 - ALWAYS cite specific D/E ratios, OCF numbers, and borrowing levels.
@@ -68,12 +81,19 @@ export function parseRiskOutput(raw: string): RiskAgentOutput | null {
 
     return {
       overall_risk: ['low', 'moderate', 'elevated', 'high', 'extreme'].includes(data.overall_risk) ? data.overall_risk : 'moderate',
-      primary_risks: Array.isArray(data.primary_risks) ? data.primary_risks.map((r: Record<string, unknown>) => ({
-        risk: String(r.risk ?? ''),
-        severity: ['high', 'medium', 'low'].includes(String(r.severity)) ? String(r.severity) as 'high' | 'medium' | 'low' : 'medium',
-        likelihood: ['high', 'medium', 'low'].includes(String(r.likelihood)) ? String(r.likelihood) as 'high' | 'medium' | 'low' : 'medium',
-        evidence: String(r.evidence ?? ''),
-      })) : [],
+      primary_risks: (() => {
+        const risks = Array.isArray(data.primary_risks) ? data.primary_risks.map((r: Record<string, unknown>) => ({
+          risk: String(r.risk ?? ''),
+          severity: ['high', 'medium', 'low'].includes(String(r.severity)) ? String(r.severity) as 'high' | 'medium' | 'low' : 'medium',
+          likelihood: ['high', 'medium', 'low'].includes(String(r.likelihood)) ? String(r.likelihood) as 'high' | 'medium' | 'low' : 'medium',
+          evidence: String(r.evidence ?? ''),
+        })) : [];
+        // Devil's advocate mandate: pad to minimum 2 risks
+        while (risks.length < 2) {
+          risks.push({ risk: 'Insufficient risk analysis — model failed to identify enough risks', severity: 'medium' as const, likelihood: 'medium' as const, evidence: 'N/A' });
+        }
+        return risks;
+      })(),
       risk_mitigants: Array.isArray(data.risk_mitigants) ? data.risk_mitigants.map(String) : [],
       tail_risk: String(data.tail_risk ?? ''),
       key_findings: Array.isArray(data.key_findings) ? data.key_findings.map(String) : [],

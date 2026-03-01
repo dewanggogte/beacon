@@ -4,7 +4,10 @@
  */
 import type { SynthesisAgentOutput } from './agent-types.js';
 
-export function buildSynthesisSystemPrompt(lynchCategory: string): string {
+export function buildSynthesisSystemPrompt(
+  lynchCategory: string,
+  regimeContext?: { regime: string; confidence: string; signals: string[] } | null,
+): string {
   const categoryGuidance: Record<string, string> = {
     fast_grower: 'For fast growers: Is growth sustainable at current pace? PEG ratio is key. Watch for margin compression as company scales. Growth deceleration is the primary risk.',
     stalwart: 'For stalwarts: Is the company fairly valued? Margin stability and dividend growth matter. Overpaying for a stalwart is the primary risk.',
@@ -33,21 +36,50 @@ SYNTHESIS RULES:
 5. DISQUALIFIED companies: Cannot receive positive conviction. Period.
 6. The adjustment range is WIDER here (-15 to +15) because you see the full picture.
 
-WHAT MAKES HIGH CONVICTION:
-- Buffett score >= 75 AND Graham OR Lynch score >= 70
-- Pabrai risk <= "moderate"
-- AG2 governance >= "adequate"
-- AG3 overall_risk <= "moderate"
-- No active disqualifiers
-- The company's strengths align with its Lynch category expectations
-</methodology>
+CONVICTION CALIBRATION:
 
+HIGH conviction requires ALL of:
+  - Buffett score >= 75
+  - At least one of: Graham score >= 70 OR Lynch category score >= 70
+  - Pabrai overall risk is "low" or "moderate"
+  - AG2 governance is "strong" or "adequate"
+  - AG3 overall risk is "low" or "moderate"
+  - Company is NOT disqualified
+  - The company's strengths align with its Lynch category expectations
+
+MEDIUM conviction requires:
+  - At least 4 of the 7 HIGH criteria are met
+  - No single criterion is severely failed (e.g., governance "red_flag" blocks medium)
+
+LOW conviction: Some positive signals but significant concerns remain.
+NONE: Disqualified, or multiple severe failures across criteria.
+
+IMPORTANT: "conviction" means "how strongly should we act on this thesis?"
+It is NOT the same as "confidence" (how sure you are about your analysis).
+A well-analyzed terrible company = high confidence, none conviction.
+</methodology>
+${regimeContext ? `
+<macro_regime>
+Current macro regime: ${regimeContext.regime} (${regimeContext.confidence} confidence)
+Key signals: ${regimeContext.signals.join('; ')}
+
+Consider how this macro environment affects the ${lynchCategory} category:
+${regimeContext.regime === 'stagflation' ? '- Stagflation hurts growth stocks most. Favor companies with pricing power and low debt.' : ''}${regimeContext.regime === 'goldilocks' ? '- Goldilocks favors growth. But watch for overvaluation in the general euphoria.' : ''}${regimeContext.regime === 'reflation' ? '- Reflation favors cyclicals and turnarounds. Watch for rate-sensitive sectors.' : ''}${regimeContext.regime === 'deflation' ? '- Deflation favors cash-rich stalwarts and slow growers with strong dividends.' : ''}
+</macro_regime>
+` : ''}
 <instructions>
 1. Read all three analyst reports carefully
 2. Identify where they agree and disagree
 3. Weight the risk analyst's concerns more heavily when there's conflict
 4. Form a coherent investment thesis
 5. Assign conviction based on the criteria above
+
+ANALYSIS CHAIN (follow this order in your reasoning field):
+1. CONSENSUS: Where do the 3 analysts agree? Where do they disagree?
+2. RISK OVERRIDE: Does the risk analyst raise concerns that override positive fundamentals?
+3. CATEGORY FIT: How well does this stock fit its Lynch category expectations?
+4. CONVICTION TEST: Does it pass ALL four gates (fundamentals + governance + risk + valuation)?
+5. VERDICT: Investment thesis direction and magnitude.
 
 CRITICAL: Your final_adjustment range is -15 to +15. Use the full range when warranted.
 </instructions>

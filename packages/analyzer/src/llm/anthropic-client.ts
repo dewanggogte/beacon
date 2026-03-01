@@ -1,14 +1,19 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { logger } from '@screener/shared';
+import type { LlmClient, LlmGenerateOptions } from './llm-client.js';
 
 const DEFAULT_MODEL = 'claude-haiku-4-5';
 const SYNTHESIS_MODEL = 'claude-sonnet-4-5';
 
-export class AnthropicClient {
+export class AnthropicClient implements LlmClient {
   private client: Anthropic;
 
   constructor() {
     this.client = new Anthropic();
+  }
+
+  get synthesisModel(): string {
+    return SYNTHESIS_MODEL;
   }
 
   /**
@@ -18,12 +23,7 @@ export class AnthropicClient {
   async generate(
     system: string,
     user: string,
-    options: {
-      model?: string;
-      maxTokens?: number;
-      temperature?: number;
-      cacheSystemPrompt?: boolean;
-    } = {},
+    options: LlmGenerateOptions = {},
   ): Promise<string> {
     const {
       model = DEFAULT_MODEL,

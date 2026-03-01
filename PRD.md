@@ -22,13 +22,14 @@ This project builds an automated pipeline that:
 - Provide complete transparency: every score traceable to data + documented principle
 - Run autonomously on a weekly schedule without manual intervention
 - Never get blocked by Screener.in (sustainable, polite scraping)
+- Backtest scoring system against historical price data to validate signal quality
 
 ### Non-Goals
 - Real-time trading signals or intraday data
 - Portfolio management or trade execution
 - Serving multiple users (single-user tool)
 - Mobile app (responsive web is sufficient)
-- Backtesting engine (may add later)
+- ~~Backtesting engine~~ → Moved to Goals (built in v2 Phase 5)
 
 ---
 
@@ -90,7 +91,7 @@ Sunday ── Dashboard updated with new data
 | **Database** | PostgreSQL 17 (Homebrew) | Structured queries, JSONB for flexible data, time-series snapshots |
 | **ORM** | Drizzle ORM | Type-safe schema-as-code, auto-generated migrations, studio UI |
 | **DB driver** | postgres (postgres.js) | Fast, native ESM, recommended by Drizzle |
-| **LLM** | Anthropic Claude (Haiku 4.5 + Sonnet) | Multi-agent architecture with prompt caching. ~$5-7/run. |
+| **LLM** | Anthropic Claude OR local Qwen 3.5 | 4-agent architecture (AG1 fundamentals, AG2 governance, AG3 risk, AG4 synthesis). Dual-provider: Anthropic (Haiku/Sonnet, prompt caching) or local Qwen 3.5-35B via SGLang (`LLM_PROVIDER` env var). Structured chain-of-thought prompts, devil's advocate in AG3, post-LLM validation, macro regime context in AG4, peer comparison data. Tiered: Tier 1 = full 4-agent, Tier 2 = AG1 only, Tier 3 = no LLM. |
 | **Dashboard** | Next.js 15 + Tailwind CSS | Best for interactive data-dense apps, Server Components |
 | **Data grid** | TanStack Table | High-performance virtual scrolling, type-safe |
 | **Charts** | Lightweight Charts + Recharts | Financial charts (TradingView) + general charts |
@@ -104,8 +105,8 @@ Sunday ── Dashboard updated with new data
 | Raw `pg` client | Drizzle ORM | Type-safe queries, auto migrations, studio UI. Better DX. |
 | 6-8 hour scrape estimate | 18-24 hour realistic estimate | Conservative rate limiting (2-8s delays + batch/session breaks) with ~5,300 companies. May scrape only liquid stocks weekly. |
 | pnpm/unspecified | npm workspaces | User preference. npm comes with Node.js, no extra install. |
-| Ollama + Qwen 2.5 | Anthropic Claude API | Multi-agent LLM with 4 specialized agents. Prompt caching for efficiency. |
-| Single LLM prompt | 4-agent architecture | AG1 (fundamentals), AG2 (governance), AG3 (risk), AG4 (synthesis). Tiered execution. |
+| Ollama + Qwen 2.5 | Anthropic Claude OR local Qwen 3.5 | Multi-agent LLM with 4 specialized agents. Dual-provider support. Prompt caching (Anthropic), thinking-mode disabled (Qwen). |
+| Single LLM prompt | 4-agent architecture | AG1-3 specialist analysts + AG4 CIO synthesis. Structured CoT, devil's advocate, post-validation, macro regime, peer comparison, conviction calibration. |
 | No frameworks | Buffett/Graham/Lynch/Pabrai | 4 independent framework evaluators with classification-aware composite scoring. |
 | No backtesting | yfinance + walk-forward | Historical price data + performance validation infrastructure. |
 
@@ -242,7 +243,32 @@ screener-automation/
 │   │   ├── src/
 │   │   │   ├── index.ts
 │   │   │   ├── scoring/
+│   │   │   ├── enrichment/
+│   │   │   │   └── flatten-v2.ts      # 60+ metric extraction from JSONB
+│   │   │   ├── frameworks/
+│   │   │   │   ├── buffett-evaluator.ts
+│   │   │   │   ├── graham-evaluator.ts
+│   │   │   │   ├── lynch-classifier.ts
+│   │   │   │   ├── pabrai-risk.ts
+│   │   │   │   └── composite-v2.ts
 │   │   │   ├── llm/
+│   │   │   │   ├── qualitative-analyzer.ts   # Orchestrator: tiered execution, macro loading
+│   │   │   │   ├── create-llm-client.ts      # Factory: Anthropic or local Qwen
+│   │   │   │   ├── llm-client.ts             # Interface
+│   │   │   │   ├── anthropic-client.ts        # Anthropic SDK client
+│   │   │   │   ├── openai-compatible-client.ts # Local LLM (SGLang/vLLM) client
+│   │   │   │   └── agents/
+│   │   │   │       ├── agent-types.ts         # Shared types
+│   │   │   │       ├── data-pack-builder.ts   # Agent-specific data payloads
+│   │   │   │       ├── fundamentals-agent.ts  # AG1: structured CoT, peer methodology
+│   │   │   │       ├── governance-agent.ts    # AG2: structured CoT
+│   │   │   │       ├── risk-agent.ts          # AG3: structured CoT, devil's advocate
+│   │   │   │       ├── synthesis-agent.ts     # AG4: macro regime, conviction calibration
+│   │   │   │       └── post-validation.ts     # Cross-check LLM output vs quant data
+│   │   │   ├── macro/
+│   │   │   │   ├── macro-loader.ts
+│   │   │   │   └── regime-classifier.ts
+│   │   │   ├── backtest/
 │   │   │   ├── pipeline/
 │   │   │   ├── output/
 │   │   │   └── storage/
@@ -356,22 +382,94 @@ Each metric scored 0-100 with **sector-specific thresholds** (e.g., IT P/E of 30
 - Potential Short: 20-40
 - Strong Avoid: <20 or disqualified
 
-### 8.2 Layer 2: LLM Qualitative Analysis (Ollama + Qwen, 2-8 hours)
+### 8.2 Layer 2: LLM Qualitative Analysis (~1-20 min depending on provider)
 
-Run only on top 200 + bottom 200 companies by composite score.
+Multi-agent architecture with tiered execution. Supports two LLM providers:
+- **Anthropic Claude** (`LLM_PROVIDER=anthropic`): Haiku for AG1-3, Sonnet for AG4. Prompt caching (5-min TTL).
+- **Local Qwen 3.5** (`LLM_PROVIDER=local`): Same model (qwen3.5-35b-a3b) for all 4 agents via SGLang/vLLM on `LOCAL_LLM_URL`. Thinking mode disabled via `chat_template_kwargs`.
 
-**LLM output per company:**
-- Trend narrative (2-3 sentences)
-- Risk factors (array)
-- Catalysts (array)
-- Qualitative adjustment (-10 to +10 points)
-- Confidence level (high/medium/low)
-- Reasoning
+**4-Agent Design:**
+
+| Agent | Role | Max Tokens | Key Features |
+|-------|------|-----------|--------------|
+| AG1 Fundamentals | Financial strength, trends, valuation | 4,096 | Structured CoT (5-step), peer comparison data when available |
+| AG2 Governance | Promoter behavior, institutional confidence | 4,096 | Structured CoT (4-step), shareholding trend analysis |
+| AG3 Risk | Downside scenarios, Pabrai risk hierarchy | 4,096 | Structured CoT (5-step), devil's advocate mandate (min 2 risks), risk parser pads to 2 if model under-delivers |
+| AG4 Synthesis | Combines AG1-3 into final thesis | 4,096 | Structured CoT (5-step), macro regime context, peer comparison, unambiguous conviction calibration (7 gates) |
+
+AG1→AG2→AG3→AG4 run sequentially per company (AG4 depends on AG1-3 outputs). Different companies can run in parallel.
+
+**Tiered Execution:**
+
+| Tier | Companies | Agents | Rationale |
+|------|-----------|--------|-----------|
+| Tier 1 | Top + bottom 100 by composite | All 4 (AG1→AG4) | Full analysis for actionable candidates |
+| Tier 2 | Top 500 (minus Tier 1) | AG1 only | Quick fundamentals check for watchlist |
+| Tier 3 | Remaining ~4,800 | None | Layer 1 score stands alone |
+
+**Prompt Caching (Anthropic only):** All agents use `cacheSystemPrompt: true` (ephemeral cache, 5-min TTL). System prompts cached after first company, reducing input costs ~90% within TTL.
+
+**Data Context Fed to Agents:**
+
+| Data | Fed to | Source |
+|------|--------|--------|
+| Framework scores (Buffett/Graham/Lynch/Pabrai) | AG1, AG3, AG4 | Layer 1 framework evaluators |
+| 13-year time series (ROE, revenue, OCF, etc.) | AG1, AG3 | flattenV2 enrichment |
+| Shareholding history (12 quarters) | AG2 | flattenV2 enrichment |
+| Peer comparison table (top 5 peers) | AG1, AG4 | Scraped from Screener.in (when available) |
+| Macro regime (goldilocks/reflation/stagflation/deflation) | AG4 | `macro_snapshots` table + regime classifier |
+| AG1-3 raw outputs | AG4 | Previous agent responses |
+
+**Post-LLM Validation (`post-validation.ts`):**
+
+After parsing each agent's output, cross-checks LLM claims against quantitative data:
+
+| Rule | Agent | Override |
+|------|-------|----------|
+| "improving" trend but revenue declined 2+ of 3 years | AG1 | Override to "deteriorating" |
+| "high" earnings quality but OCF < 50% of net profit | AG1 | Override to "medium" |
+| Positive adjustment > 3 but company disqualified | AG1 | Cap at 0 |
+| "high" conviction but company disqualified | AG4 | Override to "none" |
+| "high" conviction but signals "conflicting" | AG4 | Override to "medium" |
+| Adjustment > 10 but composite < 40 | AG4 | Cap at 5 |
+
+All overrides logged as warnings for transparency.
+
+**Conviction Calibration (AG4):**
+
+HIGH conviction requires ALL of:
+1. Buffett score >= 75
+2. Graham >= 70 OR Lynch category score >= 70
+3. Pabrai overall risk is "low" or "moderate"
+4. AG2 governance is "strong" or "adequate"
+5. AG3 overall risk is "low" or "moderate"
+6. Company is NOT disqualified
+7. Strengths align with Lynch category expectations
+
+MEDIUM = at least 4 of 7 met, no severe failures. LOW = some positive signals. NONE = disqualified or multiple severe failures.
+
+"Conviction" (how strongly to act) is explicitly distinguished from "confidence" (analysis certainty).
+
+**Parse Failure Handling:**
+
+Three separate counters tracked: `completed` (successful parse), `failed` (exceptions), `parseFailures` (LLM returned but couldn't parse). Only successful parses increment `completed`. Parse failures logged with company name for diagnosis.
+
+**Cost Projection (weekly, 5,300 companies, Anthropic):**
+
+| Tier | Companies | Cost/company | Subtotal |
+|------|-----------|-------------|----------|
+| Tier 1 (full 4-agent) | ~200 | ~$0.35 | ~$70 |
+| Tier 2 (AG1 only) | ~300 | ~$0.05 | ~$15 |
+| Tier 3 (no LLM) | ~4,800 | $0 | $0 |
+| **Total** | **~5,300** | | **~$85/week** |
+
+With local Qwen: $0/week (self-hosted on homelab GPU).
 
 **Guardrails:**
-- Max adjustment: +/-10 points
+- Max adjustment: +/-10 (Tier 2), +/-15 (Tier 1 via AG4 synthesis)
 - Cannot override automatic disqualifiers
-- Low confidence -> adjustment halved
+- Low/none conviction -> adjustment halved
+- Post-validation cross-checks override contradictory LLM claims
 - LLM failure -> Layer 1 score stands alone
 - 3 retries per company, then skip
 
@@ -426,51 +524,75 @@ For each company present in both current and previous runs:
 **5. Pipeline Status**
 - Last scrape: timestamp, success rate, duration
 - Last analysis: timestamp, summary stats
-- System health: DB connection, Ollama status
+- System health: DB connection, API status
 
 ---
 
 ## 10. Milestones & Acceptance Criteria
 
-### M1: Infrastructure Ready
-- [ ] Git repo initialized
-- [ ] `npm install` + `npm run typecheck` pass
-- [ ] PostgreSQL running, migrations applied
-- [ ] Can insert/query company rows
+### M1: Infrastructure Ready ✓
+- [x] Git repo initialized
+- [x] `npm install` + `npm run typecheck` pass
+- [x] PostgreSQL running, migrations applied
+- [x] Can insert/query company rows
 
-### M2: Scraper Functional
-- [ ] Company list fetched (~5,300 companies)
-- [ ] 10 companies scraped successfully (test mode)
-- [ ] Data stored correctly in company_snapshots
-- [ ] Rate limiter enforces delays
-- [ ] Resume works after interruption
-- [ ] No IP blocking during test runs
+### M2: Scraper Functional ✓
+- [x] Company list fetched (~5,300 companies via search API + 2-letter combos)
+- [x] Companies scraped successfully with HTTP + Cheerio
+- [x] Data stored correctly in company_snapshots (JSONB)
+- [x] Rate limiter enforces delays (normal-distribution 2-8s)
+- [x] Resume works after interruption
+- [x] No IP blocking during test runs
 
-### M3: Principles Documented
-- [ ] scoring-rubric.json validates against TypeScript schema
-- [ ] 5 dimensions with 20+ metrics defined
-- [ ] 20+ red flags documented with detection methods
-- [ ] Sector-specific adjustments for IT, Banking, Pharma, Manufacturing, FMCG
+### M3: Principles Documented ✓
+- [x] scoring-rubric.json validates against TypeScript schema
+- [x] 5 dimensions with 21 metrics defined
+- [x] 20+ red flags documented with detection methods
+- [x] Sector-specific adjustments for IT, Banking, Pharma, Manufacturing, FMCG
+- [x] 4 framework configs: Buffett, Graham, Lynch, Pabrai
 
-### M4: Analyzer Functional
-- [ ] Layer 1 scores all companies in <5 min
-- [ ] Disqualifiers correctly flag companies
-- [ ] Classification distribution is reasonable
-- [ ] Layer 2 LLM runs on top/bottom 200
-- [ ] Weekly comparison detects changes
-- [ ] Markdown reports generated
+### M4: Analyzer Functional ✓
+- [x] Layer 1 scores all companies in <5 min
+- [x] 8 disqualifiers correctly flag companies
+- [x] Classification distribution is reasonable
+- [x] Layer 2 LLM runs with 4-agent architecture (Anthropic Claude)
+- [x] 4 framework evaluators with classification-aware composite scoring
+- [x] Weekly comparison detects changes
+- [x] Markdown reports generated
 
-### M5: Dashboard Live
-- [ ] Runs at localhost:3000
-- [ ] All 5 pages functional with real data
-- [ ] Rankings table sorts/filters/exports
-- [ ] Charts render correctly
-- [ ] Dark mode Bloomberg aesthetic
+### M5: Dashboard Live ✓
+- [x] Runs at localhost:3000 and screener.nikamma.in
+- [x] 6 pages functional: home, conviction, frameworks, rankings, backtest, company detail
+- [x] Rankings table sorts/filters/exports
+- [x] Lynch category badges, conviction indicators, framework score panels
+- [x] Dark mode Bloomberg aesthetic
 
-### M6: Full Pipeline
-- [ ] `scripts/run-pipeline.ts` runs end-to-end unattended
-- [ ] Dashboard reflects latest data after pipeline run
-- [ ] Cron schedule configured for weekly execution
+### M6: Full Pipeline ✓
+- [x] `scripts/run-pipeline.ts` runs end-to-end unattended
+- [x] Dashboard reflects latest data after pipeline run
+- [x] Cron schedule configured for weekly execution (K8s CronJob)
+
+### M7: Homelab Deployment ✓
+- [x] Dockerized with multi-stage build (3 entrypoint modes: dashboard, pipeline, migrate)
+- [x] GitHub Actions CI/CD → GHCR container image → ArgoCD rollout
+- [x] K3s cluster deployment at `screener.nikamma.in` (internal only)
+- [x] CNPG-managed PostgreSQL database
+- [x] SealedSecrets for DATABASE_URL + ANTHROPIC_API_KEY
+- [x] Weekly CronJob for pipeline execution
+
+### M8: Pipeline Optimizations
+- [ ] Don't retry permanent HTTP errors (4xx except 429) — saves ~4 min per 404
+- [ ] Parallelize LLM company analysis with p-map (concurrency=5) — ~18 min → ~4 min
+- [ ] Per-company LLM progress logging (replace modulo-gated logging)
+- [ ] DB connectivity check in `/api/healthz` endpoint (return 503 if DB unreachable)
+- [ ] Auto-seed companies table if empty (run search API before scrape step)
+
+### M9: Production Readiness
+- [ ] Full 5,300-company pipeline run on homelab
+- [ ] LLM cost monitoring and alerting
+- [ ] Evaluate Haiku for AG4 synthesis (potential ~$45/week savings)
+- [ ] Tune Tier 1 count (top+bottom 50 vs 100)
+- [ ] Summarize AG1-3 outputs before AG4 (reduce Sonnet input tokens by 20-30%)
 
 ---
 
@@ -499,22 +621,120 @@ brew install postgresql@17
 brew services start postgresql@17
 createdb screener
 
-# Ollama (for LLM analysis, Phase 5)
-brew install ollama
-ollama serve &
-ollama pull qwen2.5:7b
+# Python (for price history fetcher)
+pip install yfinance pandas
 ```
 
 ### Environment Variables
 ```bash
 # .env
 DATABASE_URL=postgres://localhost:5432/screener
-OLLAMA_URL=http://localhost:11434
+ANTHROPIC_API_KEY=sk-ant-...          # Required when LLM_PROVIDER=anthropic
 SCREENER_BASE_URL=https://www.screener.in
+
+# LLM Provider (choose one)
+LLM_PROVIDER=anthropic                # "anthropic" (default) or "local"
+LOCAL_LLM_URL=http://192.168.0.42:8000  # Base URL for local model (SGLang/vLLM)
+LOCAL_LLM_MODEL=qwen3.5-35b-a3b        # Model name for local endpoint
+LOCAL_LLM_TEMPERATURE=0.7              # Temperature for local model
+```
+
+### Docker Build (for homelab deployment)
+```bash
+# Build the container image
+docker build -t screener-automation .
+
+# Run modes (set via CMD or entrypoint argument):
+docker run screener-automation dashboard   # Next.js server on :3000
+docker run screener-automation pipeline    # Scraper + analyzer
+docker run screener-automation migrate     # Run drizzle-kit migrations
 ```
 
 ---
 
-*Last updated: 2026-02-25*
-*Version: 1.0*
+## 13. Homelab Deployment
+
+The application is deployed to a K3s cluster and accessible at `screener.nikamma.in` (internal network only).
+
+### Architecture
+```
+GitHub push → GitHub Actions CI → Docker build (amd64) → Push to GHCR
+                                                            ↓
+                                              ArgoCD detects new image
+                                                            ↓
+                                              K3s rollout restart
+```
+
+### Components
+| Component | Detail |
+|-----------|--------|
+| **Container registry** | `ghcr.io/dewanggogte/screener-automation:latest` (public) |
+| **K8s namespace** | `screener-automation` (ArgoCD auto-creates) |
+| **Database** | CNPG-managed PostgreSQL, `screener` DB on `postgres-rw.postgres.svc.cluster.local:5432` |
+| **Secrets** | `screener-secrets` SealedSecret (DATABASE_URL + ANTHROPIC_API_KEY) |
+| **Ingress** | Internal-only at `screener.nikamma.in` |
+| **Pipeline schedule** | Weekly CronJob |
+| **Health probe** | `/api/healthz` (readiness + liveness) |
+
+### Manifest locations
+- **K8s manifests**: `/Users/dg/Documents/lab/nikamma/apps/screener-automation/`
+- **ArgoCD app**: `/Users/dg/Documents/lab/nikamma/argocd/apps/screener-automation.yaml`
+
+### First-run note
+The pipeline requires companies in the DB to scrape. On a fresh deploy, the `list` command must run first to seed the companies table (~5 min via search API). See M8 for auto-seed improvement.
+
+---
+
+## 14. Next Steps: Pipeline Improvements
+
+Based on the first homelab pipeline run (20 companies, ~23 min), these improvements are prioritized by impact.
+
+### 14.1 Don't Retry Permanent HTTP Errors (Quick Win)
+
+**Problem:** The retry logic retries ALL non-blocked errors 3x with exponential backoff (30s/60s/120s). A 404 is permanent — retrying wastes ~3.5 minutes per company.
+
+**Fix:** After BlockedError checks, bail out immediately on 4xx status codes (except 429 rate limit). 404, 401, 410 fail immediately. 429 and 5xx still retry.
+
+**Impact:** Saves ~4 minutes per company with a bad URL. No downside — permanent errors don't become temporary by waiting.
+
+### 14.2 Parallelize LLM Company Analysis (Big Win)
+
+**Problem:** Companies are analyzed sequentially. Each Tier 1 company = 4 sequential API calls (~57 sec). 19 companies = ~18 min of serial execution.
+
+**Fix:** Use `p-map` (concurrency=5) to process multiple companies simultaneously. The AG1→AG4 chain stays sequential per company (AG4 depends on AG1-3), but different companies are independent.
+
+**Impact:** ~18 min → ~4-5 min for LLM phase. Haiku rate limit is generous (50+ RPM). At concurrency 5 with 4 calls/company, peak is ~20 RPM — well within limits. Anthropic SDK auto-retries if rate limited.
+
+**Dependency:** `p-map` (~8KB, 300M+ weekly downloads, actively maintained, pure ESM).
+
+### 14.3 Per-Company LLM Progress Logging (Observability)
+
+**Problem:** Current logging uses `completed % 50 === 0` (Tier 2) and `completed % 10 === 0` (Tier 1). For 19 companies, you get exactly one progress line then silence until done.
+
+**Fix:** Log before each company starts and after completion with company code and tier. With parallelization, lines interleave — the company code identifies each line.
+
+### 14.4 DB Connectivity in Health Endpoint (Reliability)
+
+**Problem:** `/api/healthz` returns `{ status: "ok" }` unconditionally. If the DB goes down, K8s thinks the pod is healthy and keeps routing traffic to it.
+
+**Fix:** Run `SELECT 1` against the DB. Return 503 on failure so K8s readiness probe pulls the pod from service, and liveness probe eventually restarts it.
+
+### 14.5 Auto-Seed Companies if Table Empty (Correctness)
+
+**Problem:** The weekly CronJob runs the pipeline, but if the companies table is empty (fresh deploy, DB wipe), it silently produces 0 results. The `list` command is a separate manual step.
+
+**Fix:** Before the scrape step, check if companies table has 0 rows. If empty, run `fetchCompanyList({ searchOnly: true })` automatically (~5 min, ~4,000 companies via search API). Only triggers once on a fresh DB.
+
+### 14.6 Token Cost Optimization (Future)
+
+| Idea | Potential savings | Trade-off |
+|------|-------------------|-----------|
+| Evaluate Haiku for AG4 synthesis | ~$45/week (65% of LLM cost) | May reduce synthesis quality — needs benchmarking |
+| Reduce Tier 1 to top+bottom 50 | ~$35/week | Fewer companies get full analysis |
+| Summarize AG1-3 outputs before AG4 | ~$10-15/week | Adds complexity, may lose nuance |
+
+---
+
+*Last updated: 2026-03-02*
+*Version: 2.1*
 *Reference docs: docs/00-PROJECT-OVERVIEW.md, docs/01-TASK1-SCRAPER.md, docs/02-TASK2-PRINCIPLES.md, docs/03-TASK3-ANALYSIS.md*

@@ -40,7 +40,15 @@ LYNCH: Stock category determines what matters:
 2. Then check earnings quality: does cash flow confirm reported profits?
 3. Assess whether the Buffett/Graham criteria PASS/FAIL results are justified
 4. For the company's Lynch category, evaluate category-specific factors
-5. Identify what the NUMBERS ALONE cannot tell us — qualitative gaps
+5. Compare the company's P/E, ROCE, and margins against peers when peer data is available
+6. Identify what the NUMBERS ALONE cannot tell us — qualitative gaps
+
+ANALYSIS CHAIN (follow this order in your reasoning field):
+1. TREND: Is revenue/profit trajectory accelerating, steady, or declining? Cite 3+ years.
+2. QUALITY: Does OCF confirm earnings? Owner earnings trend?
+3. VALUATION: Is current price justified by growth rate? PEG, P/E vs sector, Graham number.
+4. CATEGORY FIT: How well does this company perform AS its Lynch category?
+5. VERDICT: Net positive or negative? Magnitude of adjustment.
 
 CRITICAL RULES:
 - NEVER calculate ratios yourself. All numbers are pre-computed and correct.

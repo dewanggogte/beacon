@@ -91,13 +91,20 @@ Screener.in HTML
      ┌────────────────────────────────────────────────────┐
      │  MULTI-AGENT LLM LAYER                             │
      │                                                    │
+     │  Provider: Anthropic (Haiku/Sonnet) or local Qwen  │
+     │  All agents: maxTokens 4096, structured CoT        │
+     │                                                    │
      │  Tier 2 (top 500 + bottom 200):                    │
      │    AG1 only → fundamentals adjustment (-5 to +5)   │
+     │    + post-validation cross-check                   │
      │                                                    │
      │  Tier 1 (top 100 + bottom 50):                     │
      │    AG1 → AG2 → AG3 → AG4 (sequential)             │
+     │    AG3 has devil's advocate mandate (min 2 risks)  │
+     │    AG4 receives macro regime context + peers        │
+     │    AG4 uses 7-gate conviction calibration          │
      │    Synthesis adjustment (-15 to +15)               │
-     │    Conviction override possible                    │
+     │    + post-validation cross-check on AG1 + AG4      │
      │                                                    │
      │  All others: Layer 1 score stands as-is            │
      └──────────────────────┬─────────────────────────────┘
@@ -153,12 +160,24 @@ What each LLM agent receives and produces.
     Market Cap, P/E, P/B, Div Yield, ROCE, ROE, D/E, 52W range
   </current_metrics>
 
+  <peer_comparison>
+    | Name | CMP | P/E | Mar Cap | ROCE | Div Yld | ...
+    (top 5 peers from Screener.in)
+  </peer_comparison>
+
   <screener_signals>
     Pros: [list from Screener.in]
     Cons: [list from Screener.in]
   </screener_signals>
 </company_data>
 ```
+
+**Structured CoT (ANALYSIS CHAIN):**
+1. TREND: Revenue/profit trajectory — accelerating, steady, or declining? Cite 3+ years.
+2. QUALITY: Does OCF confirm earnings? Owner earnings trend?
+3. VALUATION: Price justified by growth? PEG, P/E vs sector peers, Graham number.
+4. CATEGORY FIT: How well does the company perform AS its Lynch category?
+5. VERDICT: Net positive or negative? Magnitude of adjustment.
 
 **Output:**
 ```json
@@ -170,9 +189,14 @@ What each LLM agent receives and produces.
   "positive_signals": ["signal with evidence"],
   "adjustment": -5 to +5,
   "confidence": "high|medium|low",
-  "reasoning": "2-3 sentences"
+  "reasoning": "structured CoT following analysis chain"
 }
 ```
+
+**Post-validation** cross-checks AG1 output against quantitative data:
+- "improving" trend + revenue declined 2+ of last 3 years → override to "stable" or "deteriorating"
+- "high" earnings quality + OCF < 50% of net profit → override to "medium"
+- Positive adjustment on disqualified company → capped at 0
 
 ### AG2: Governance Analyst
 
@@ -181,6 +205,12 @@ What each LLM agent receives and produces.
 - Promoter pledge data
 - Screener pros/cons (governance-relevant)
 - Framework governance dimension score
+
+**Structured CoT (ANALYSIS CHAIN):**
+1. PROMOTER: Accumulating, maintaining, or divesting? Pledge risk?
+2. INSTITUTIONS: FIIs/DIIs accumulating or exiting? Signal interpretation.
+3. RED FLAGS: Governance red flags in pros/cons or shareholding patterns?
+4. VERDICT: Net governance risk level and direction.
 
 **Output:**
 ```json
@@ -201,6 +231,15 @@ What each LLM agent receives and produces.
 - Lynch category + cyclicality data
 - Disqualification status and reasons
 
+**Structured CoT (ANALYSIS CHAIN):**
+1. SURVIVAL: Can the company survive 2 years of zero revenue? D/E, OCF, borrowings.
+2. PRIMARY RISK: #1 risk for this Lynch category? How severe here?
+3. HIDDEN RISKS: What do pros/cons suggest that numbers don't show?
+4. TAIL RISK: Worst-case scenario and probability.
+5. VERDICT: Overall risk level and magnitude of adjustment.
+
+**Devil's Advocate Mandate:** AG3 MUST identify at least 2 non-trivial risks. "No significant risks" is never acceptable — every company has risks. The parser enforces a minimum of 2 entries in `primary_risks` (padded with generic entries if the model returns fewer).
+
 **Output:**
 ```json
 {
@@ -218,7 +257,23 @@ What each LLM agent receives and produces.
 - AG1, AG2, AG3 full JSON outputs (key_findings propagate)
 - All framework scores + methodology context
 - Composite score + classification
-- Peer comparison data
+- Peer comparison data (top 5 peers)
+- Macro regime context (if available): regime name, confidence, signals, category-specific guidance
+
+**Structured CoT (ANALYSIS CHAIN):**
+1. CONSENSUS: Where do the 3 analysts agree? Where do they disagree?
+2. RISK OVERRIDE: Does the risk analyst raise concerns that override positive fundamentals?
+3. CATEGORY FIT: How well does this stock fit its Lynch category expectations?
+4. CONVICTION TEST: Does it pass ALL gates (fundamentals + governance + risk + valuation)?
+5. VERDICT: Investment thesis direction and magnitude.
+
+**Conviction Calibration (7 gates):**
+- HIGH requires ALL of: Buffett >= 75, Graham >= 70 OR Lynch >= 70, Pabrai risk low/moderate, AG2 governance strong/adequate, AG3 risk low/moderate, not disqualified, strengths align with Lynch category
+- MEDIUM: At least 4 of 7 HIGH criteria met, no single severe failure
+- LOW: Some positive signals but significant concerns
+- NONE: Disqualified, or multiple severe failures
+
+Note: "conviction" = how strongly to act on the thesis. "confidence" = certainty about the analysis. A well-analyzed terrible company = high confidence, none conviction.
 
 **Output:**
 ```json
@@ -231,6 +286,41 @@ What each LLM agent receives and produces.
   "time_horizon": "6m|1y|2y|5y",
   "key_monitor_items": ["what to watch"]
 }
+```
+
+**Post-validation** cross-checks AG4 output against quantitative data:
+- "high" conviction on disqualified company → override to "none"
+- "high" conviction with conflicting signal alignment → override to "medium"
+- Adjustment > 10 on composite < 40 → capped at 5
+
+## Post-Validation Flow
+
+After each agent's output is parsed, a cross-check validates LLM claims against quantitative data.
+
+```
+AG1 parsed output + EnrichedSnapshot + CompanyAnalysis
+    │
+    v
+validateFundamentals()
+    │
+    ├── trend vs revenue history    → override if contradicted
+    ├── earnings quality vs OCF     → override if contradicted
+    └── adjustment vs disqualified  → cap at 0
+    │
+    v
+AG1 output with overrides applied + warnings logged
+
+AG4 parsed output + CompanyAnalysis
+    │
+    v
+validateSynthesis()
+    │
+    ├── conviction vs disqualified      → override to "none"
+    ├── conviction vs signal_alignment  → downgrade if conflicting
+    └── adjustment vs composite score   → cap if score too low
+    │
+    v
+AG4 output with overrides applied + warnings logged
 ```
 
 ## Insight Propagation
@@ -254,14 +344,26 @@ flattenV2 time series
     ├── Screener cons: "Promoter            ──> AG2 (pledge trajectory)
     │   pledge at 42%"
     │
+    ├── peer_comparison[]:                  ──> AG1 (relative valuation)
+    │   "P/E, ROCE, margins vs              ──> AG4 (sector positioning)
+    │    top 5 sector peers"
+    │
+    ├── macro regime:                       ──> AG4 (regime-aware thesis)
+    │   "goldilocks / stagflation / ..."
+    │
     ├── AG1 key_findings:                   ──> AG4 (weighs heavily)
     │   "OCF negative 3yr"
     │
     ├── AG2 key_findings:                   ──> AG4 (governance signal)
     │   "Promoter accumulating"
     │
-    └── AG3 key_findings:                   ──> AG4 (may cap conviction)
-        "Covenant breach risk"
+    ├── AG3 key_findings:                   ──> AG4 (may cap conviction)
+    │   "Covenant breach risk"
+    │   (min 2 risks enforced by
+    │    devil's advocate mandate)
+    │
+    └── Post-validation:                    ──> overrides applied
+        "trend contradicts data"                before final score
 ```
 
 ## Conviction Flow
@@ -269,14 +371,26 @@ flattenV2 time series
 ```
                     Layer 1                          Layer 2
                     ──────                           ──────
-computeConviction()                         AG4 synthesis
+computeConviction()                         AG4 synthesis (7-gate calibration)
 │                                           │
-├── score >= 80?                            ├── conviction = "high"?
-├── 2+ frameworks >= 75?                    │   → override if quantitative
-├── Pabrai >= 60?                           │     conviction was lower
-├── No disqualifiers?                       │
-│                                           └── conviction_reasoning saved
-└── → high / medium / low / none
+├── score >= 80?                            ├── Buffett >= 75?
+├── 2+ frameworks >= 75?                    ├── Graham >= 70 OR Lynch >= 70?
+├── Pabrai >= 60?                           ├── Pabrai risk low/moderate?
+├── No disqualifiers?                       ├── AG2 governance strong/adequate?
+│                                           ├── AG3 risk low/moderate?
+└── → high / medium / low / none            ├── Not disqualified?
+                                            ├── Strengths align with Lynch category?
+                                            │
+                                            ├── ALL 7 → HIGH conviction
+                                            ├── 4+ of 7 → MEDIUM conviction
+                                            ├── Some positive → LOW conviction
+                                            └── Disqualified or severe failures → NONE
+                                            │
+                                            v
+                                     Post-validation:
+                                       HIGH + disqualified → NONE
+                                       HIGH + conflicting signals → MEDIUM
+                                       adjustment > 10 + score < 40 → cap at 5
 ```
 
 ## Dashboard Data Flow
@@ -344,9 +458,11 @@ Manual entry (CLI) → macro_snapshots table
                    │  Growth↑ Inflation↑    │ → Reflation
                    │  Growth↓ Inflation↑    │ → Stagflation
                    │  Growth↓ Inflation↓    │ → Deflation
-                   └────────────────────────┘
-                          │
-                          v
+                   └────────────┬───────────┘
+                          │     │
+                          │     └──────────────> AG4 synthesis prompt
+                          │                      (regime name, confidence,
+                          v                       signals, category guidance)
                    getRegimeAdjustments()
                    ┌────────────────────────┐
                    │ Per Lynch category:    │
