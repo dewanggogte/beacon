@@ -382,6 +382,25 @@ Each metric scored 0-100 with **sector-specific thresholds** (e.g., IT P/E of 30
 - Potential Short: 20-40
 - Strong Avoid: <20 or disqualified
 
+#### 8.1.1 Planned Scoring Model Additions
+
+The following quantitative models will be added to Layer 1, ordered by expected impact on identifying undervalued stocks:
+
+| Model | Priority | What It Adds |
+|-------|----------|-------------|
+| **DCF Intrinsic Value** | P1 | 10-year DCF using owner earnings (net profit + depreciation − capex), 3-tier discount rates (12/15/18%), terminal growth 3-4%. Outputs intrinsic value + margin of safety %. Replaces simplistic P/E-only valuation. |
+| **Reverse DCF** | P2 | Given current market price, solve for implied growth rate. If market implies >25% growth for a stalwart, it's overpriced regardless of other metrics. |
+| **Piotroski F-Score** | P3 | 9-point binary quality score (profitability 4pts, leverage/liquidity 3pts, efficiency 2pts). Academic research shows +7.5% annual alpha. All input data already available in flattenV2. |
+| **Earnings Yield + FCF Yield** | P4 | EBIT/EV (earnings yield) and FCF/EV (FCF yield) — superior to P/E for cross-sector comparison. Accounts for capital structure differences. |
+| **Price Momentum** | P5 | 6-month and 12-month price returns from `price_history` table. Combined with value metrics for "trending value" strategy (value + momentum outperforms either alone in academic literature). |
+| **Quarterly Acceleration** | P6 | QoQ revenue and profit growth acceleration (is growth speeding up or slowing?). Leading indicator — catches turnarounds and deterioration 1-2 quarters before annual data shows it. |
+| **Greenblatt Magic Formula** | P7 | Rank all companies by earnings yield (EBIT/EV) + ROIC. Combined rank identifies cheap + quality stocks. Simple but powerful — 30% CAGR in Greenblatt's original study. |
+| **Altman Z-Score** | P10 | Bankruptcy prediction model (5 financial ratios). Z < 1.8 = distress zone → auto-disqualifier candidate. Adds to safety dimension. |
+
+**Additional metrics for flattenV2 enrichment:**
+- **Beneish M-Score**: Earnings manipulation detection — flags companies likely inflating earnings via accruals.
+- **ROIC** (Return on Invested Capital): More accurate than ROE for companies with significant debt. Key input for Magic Formula and Buffett evaluator.
+
 ### 8.2 Layer 2: LLM Qualitative Analysis (~1-20 min depending on provider)
 
 Multi-agent architecture with tiered execution. Supports two LLM providers:
@@ -473,6 +492,15 @@ With local Qwen: $0/week (self-hosted on homelab GPU).
 - LLM failure -> Layer 1 score stands alone
 - 3 retries per company, then skip
 
+#### 8.2.1 Planned LLM Pipeline Enhancements
+
+| Enhancement | Priority | Description |
+|-------------|----------|-------------|
+| **Expand LLM to all companies** | P8 | Run AG1 (fundamentals only) on ALL ~5,300 companies, not just Tier 1+2 (~700). With local Qwen at $0 cost and parallelization, full coverage is feasible in ~4-6 hours. Tier system still applies for AG2-4 depth. |
+| **Pre-parse AG1-3 for AG4** | P9 | Currently AG4 receives raw JSON strings from AG1-3. Parse these into structured summaries so AG4 gets clean, consistent input. Reduces AG4 input tokens ~30% and improves synthesis quality. |
+| **LLM retry on parse failure** | P11 | When JSON parsing fails, retry the specific agent call (up to 2 retries) with a "your previous output was invalid JSON" nudge in the prompt. Currently parse failures silently skip the company. |
+| **News sentiment integration** | P12 | Feed recent news headlines/sentiment into AG4 synthesis. Source: free RSS feeds or Google News API. Adds temporal context the LLM currently lacks. Lowest priority — requires a new data source. |
+
 ### 8.3 Weekly Comparison
 
 For each company present in both current and previous runs:
@@ -481,6 +509,104 @@ For each company present in both current and previous runs:
 - Biggest movers (sorted by absolute score delta)
 - New companies (not in previous run)
 - Missing companies (delisted?)
+
+### 8.4 Pipeline Resilience: Error Handling, Testing & Logging
+
+A March 2026 audit of all 68 source files across 4 packages identified systemic gaps in error handling, test coverage, and observability. This section documents current state and planned improvements.
+
+#### 8.4.1 Error Handling — Current State
+
+**Strengths:**
+- Scraper retry logic is well-structured: `retry.ts` discriminates `CaptchaError` vs `BlockedError` (429 vs 403) with per-type backoff strategies
+- Consecutive failure tracking halts scrape before wasting time on a blocked IP
+- LLM gracefully degrades: macro regime failure doesn't crash analysis, per-company LLM failure doesn't kill the batch
+- Agent output parsers use defensive fallbacks (invalid enum values → safe defaults)
+
+**Gaps (ranked by severity):**
+
+| # | Issue | Severity | Location | Impact |
+|---|-------|----------|----------|--------|
+| 1 | No `process.on('unhandledRejection')` | High | Both CLI entry points | Escaped promise rejections crash silently — no log, no cleanup, no exit code |
+| 2 | DB queries unwrapped | High | `engine.ts`, `analysis-run.ts`, `walk-forward.ts` | Any DB hiccup (connection timeout, lock) kills entire pipeline with raw Drizzle stack trace |
+| 3 | No LLM retry logic | High | `anthropic-client.ts`, `openai-compatible-client.ts` | Transient API failures (502, timeout, rate limit) kill that company's analysis — no retry at transport level |
+| 4 | Silent catch in company list fetch | Medium | `fetch-company-list.ts:76` | Bare `catch {}` swallows failed search queries — incomplete company lists, zero logging |
+| 5 | Parse errors swallowed | Medium | All 4 agent parsers | `catch { return null }` without logging the actual error. Only counter increments. Debugging parse failures requires reproducing the exact input |
+| 6 | Config file loading unprotected | Medium | `rubric-loader.ts` | Missing or malformed JSON → raw `SyntaxError`, no context about which file failed |
+| 7 | No custom error hierarchy | Low | Everywhere except scraper | Only `BlockedError` and `CaptchaError` exist. Everything else is `new Error(string)`. No programmatic error discrimination possible |
+| 8 | Error type erasure in `.catch()` | Low | All CLI entry points | `(err as Error).message` — if thrown value isn't an `Error`, silently produces `undefined` |
+
+**Planned error hierarchy:**
+```
+PipelineError (base)
+├── ScraperError
+│   ├── BlockedError (existing)
+│   └── CaptchaError (existing)
+├── AnalysisError
+│   ├── ScoringError
+│   └── EnrichmentError
+├── LLMError
+│   ├── LLMTimeoutError
+│   ├── LLMRateLimitError
+│   └── LLMParseError
+└── ConfigError
+```
+
+#### 8.4.2 Testing — Current State
+
+**There are no automated tests.** Zero test files, zero test runner, zero test dependencies, zero CI quality gates.
+
+| Metric | Value |
+|--------|-------|
+| Test files (`.test.ts` / `.spec.ts`) | 0 |
+| Test runner configured | None |
+| Test dependencies installed | None |
+| CI test gate | None — every push deploys directly to production |
+| Code coverage | 0% across ~6,950 lines |
+
+12 manual `scripts/test-*.ts` files exist (e.g., `test-adani-power.ts`, `test-pipeline-10.ts`) — no assertions, no runner, just "run and eyeball the output."
+
+**Highest-risk untested code (by investment-decision impact):**
+
+| Area | Files | Risk |
+|------|-------|------|
+| Disqualifier logic | `disqualifier.ts` | A single bug means recommending a company that should be auto-avoided (promoter pledge >50%, negative net worth). Hard stop filters for investment decisions. |
+| Scoring engine | `engine.ts`, `metric-scorer.ts`, `dimension-scorer.ts` | Determines every company's classification. Off-by-one in threshold check → wrong category for thousands of companies. |
+| Framework evaluators | `buffett.ts`, `graham.ts`, `lynch.ts`, `pabrai.ts` | Lynch classifier determines composite weights. Misclassification cascades through entire scoring. |
+| HTML parsers | `parse-ratios.ts`, `parse-header.ts`, `parse-table.ts` | `parseIndianNumber("19,10,048")` → 1910048. Regex-based, no edge case tests. HTML structure changes break extraction silently. |
+| Post-validation | `post-validation.ts` | 6 rules cross-checking LLM claims vs quant data. Incorrect override flips valid "improving" → "deteriorating." |
+| Trend math | `trend-analyzer.ts` | CAGR, slope, consistency calculations feed every framework. Off-by-one in `years` → wrong growth rates everywhere. |
+| flattenV2 | `flatten-v2.ts` | 60+ derived metrics from 13-year JSONB. Null handling, series alignment, averages — all untested. |
+
+**Planned test framework:** Vitest (fast, ESM-native, TypeScript-first, no config overhead).
+
+**Planned test infrastructure:**
+- HTML fixtures: real Screener.in page snapshots for parser regression tests
+- Mock factories: `CompanyFactory`, `SnapshotFactory`, `AnalysisFactory` for generating typed test data
+- Mock clients: `MockHttpClient` (scraper), `MockLLMClient` (agents) — no network in tests
+- Snapshot tests: given known JSONB input → expected flattenV2 output (60+ metrics)
+
+#### 8.4.3 Logging — Current State
+
+**Logger:** Custom 4-level console wrapper (`debug`/`info`/`warn`/`error`) in `packages/shared/src/utils/logger.ts`. Configurable via `LOG_LEVEL` env var. Supports optional structured `data` parameter.
+
+| Dimension | Rating | Notes |
+|-----------|--------|-------|
+| Level consistency | Good | `info`/`warn`/`error` used correctly in business logic |
+| Structured data | Poor | Logger supports `data?: Record<string, unknown>` but it's **never used**. All logs are string interpolation. |
+| Console bypass | Poor | 107 `console.log` calls vs 98 `logger.*` calls. CLI entry points bypass the logger entirely — no timestamps, no level filtering. |
+| Trace/correlation | Fair | Run IDs logged at start, but no correlation ID threaded through a company's full journey (scrape → score → LLM → save). |
+| Debug coverage | Poor | Only 5 `logger.debug()` calls across 68 files. Scoring decisions, LLM prompts, framework evaluations — all invisible. |
+| Performance timing | Fair | Pipeline total time logged, but no per-company scrape duration, no per-agent LLM latency breakdown. |
+| Sensitive data | Good | No API keys or DB credentials leaked. |
+| Log volume | Good | Progress batched every 50 companies, not per-request. |
+| Destinations | Stdout only | Appropriate for K8s; local runs lose logs on restart. |
+
+**Planned improvements:**
+- Migrate CLI `console.log` to logger (or separate `ui.print()` for user-facing output that skips log level filtering)
+- Add structured fields to key operations: `logger.info('company scored', { company, composite, classification, tier })`
+- Pipeline-scoped correlation ID (UUID at pipeline start, threaded through all function calls)
+- Per-agent LLM timing: `logger.info('agent complete', { agent: 'AG1', company, durationMs, inputTokens, outputTokens })`
+- Expand debug-level logging in scoring, framework, and enrichment paths
 
 ---
 
@@ -594,6 +720,56 @@ For each company present in both current and previous runs:
 - [ ] Tune Tier 1 count (top+bottom 50 vs 100)
 - [ ] Summarize AG1-3 outputs before AG4 (reduce Sonnet input tokens by 20-30%)
 
+### M10: Scoring Model Upgrades
+- [ ] DCF intrinsic value calculator (owner earnings, 3-tier discount rates, margin of safety %)
+- [ ] Reverse DCF (implied growth rate from current price)
+- [ ] Piotroski F-Score (9-point quality score from existing flattenV2 data)
+- [ ] Earnings yield (EBIT/EV) and FCF yield (FCF/EV) metrics
+- [ ] Price momentum (6m/12m returns from price_history)
+- [ ] Quarterly acceleration (QoQ revenue/profit growth rate of change)
+- [ ] Greenblatt Magic Formula (combined earnings yield + ROIC rank)
+- [ ] Altman Z-Score (bankruptcy prediction, <1.8 = new disqualifier)
+- [ ] Beneish M-Score (earnings manipulation detection)
+- [ ] ROIC metric in flattenV2 enrichment
+- [ ] Banking sector separate scoring path (different metrics for financial companies)
+
+### M11: LLM Pipeline v3
+- [ ] Expand AG1 coverage to all ~5,300 companies (with parallelization)
+- [ ] Pre-parse AG1-3 outputs into structured summaries for AG4
+- [ ] LLM retry with error feedback on parse failure
+- [ ] News sentiment data source + integration into AG4
+- [ ] Backtesting: benchmark comparison (Nifty 50/500), factor attribution, position sizing simulation
+- [ ] Composite weight optimization via backtesting feedback loop
+
+### M12: Testing Foundation
+- [ ] Vitest setup (config, scripts, CI integration)
+- [ ] Test infrastructure: HTML fixtures, mock factories (Company/Snapshot/Analysis), MockHttpClient, MockLLMClient
+- [ ] `trend-analyzer.ts` tests: CAGR, slope, consistency, YoY growth (boundary values, null series, negative bases)
+- [ ] `parseIndianNumber` + parser tests: number formats, malformed input, real HTML fixtures for regression
+- [ ] `disqualifier.ts` tests: all 8 disqualifiers, boundary values (exactly 50% pledge, D/E exactly 3.0), null handling
+- [ ] `metric-scorer.ts` + `dimension-scorer.ts` tests: threshold boundaries, sector-specific adjustments
+- [ ] Framework evaluator tests: Buffett weight sums, Graham boundary values, Lynch classification logic, Pabrai risk combinations
+- [ ] `post-validation.ts` tests: all 6 override rules, null revenue series, edge cases
+- [ ] `flatten-v2.ts` snapshot tests: known JSONB input → expected 60+ metric output
+- [ ] LLM agent parser tests: valid JSON, malformed JSON, missing fields, fallback defaults
+- [ ] Add `npm test` + `npm run typecheck` to GitHub Actions CI before deploy
+- [ ] Integration test: seed DB → run Layer 1 → verify classification distribution is reasonable
+
+### M13: Error Handling & Logging Hardening
+- [ ] `process.on('unhandledRejection')` + `process.on('uncaughtException')` in both entry points
+- [ ] Custom error hierarchy: `PipelineError` → `ScraperError`, `AnalysisError`, `LLMError`, `ConfigError`
+- [ ] LLM transport-level retry wrapper (2 retries, exponential backoff, non-retryable error detection)
+- [ ] Wrap critical DB queries in try/catch with contextual error messages
+- [ ] Log actual parse errors in agent parsers before returning null
+- [ ] Fix silent `catch {}` in `fetch-company-list.ts` — log failed queries at warn level
+- [ ] Guard rubric/config file loading with try/catch and actionable error messages
+- [ ] Type-safe error catching: `err instanceof Error ? err.message : String(err)` in all `.catch()` handlers
+- [ ] Migrate CLI `console.log` to logger (or `ui.print()` for user-facing output)
+- [ ] Structured logging fields in key operations (company, tier, composite, classification, durationMs)
+- [ ] Pipeline-scoped correlation ID (UUID at pipeline start, threaded through calls)
+- [ ] Per-agent LLM timing logs (agent name, company, duration, token counts)
+- [ ] Expand `logger.debug()` coverage in scoring, framework evaluation, and enrichment paths
+
 ---
 
 ## 11. Risks & Mitigations
@@ -601,9 +777,15 @@ For each company present in both current and previous runs:
 | Risk | Severity | Mitigation |
 |------|----------|------------|
 | IP blocked by Screener.in | Critical | Ultra-conservative rate limiting, realistic headers, random order. Playwright fallback. Never scrape during market hours. |
-| Screener.in HTML structure changes | High | Modular parsers per section. Validation warns on missing fields. Quick fix = update one parser. |
+| Zero test coverage | Critical | 0% coverage across ~6,950 lines. Scoring bugs directly affect investment recommendations. Mitigation: M12 testing foundation — prioritize disqualifier, scorer, and parser tests. |
+| Screener.in HTML structure changes | High | Modular parsers per section. Validation warns on missing fields. Quick fix = update one parser. HTML fixture tests (M12) will catch regressions. |
+| No CI quality gates | High | Every push deploys to production without tests or type checking. Mitigation: add `npm test` + `npm run typecheck` to GitHub Actions (M12). |
+| Unhandled promise rejections | High | Escaped async errors crash process silently with no log output. Mitigation: process-level handlers in M13. |
+| DB query failures | High | Unwrapped Drizzle queries crash pipeline with raw stack traces. Mitigation: contextual try/catch wrappers in M13. |
 | LLM hallucination | Medium | LLM is advisory only (+/-10 points max). Quantitative Layer 1 is primary. Low confidence = halved adjustment. |
+| LLM transient failures not retried | Medium | API 502s, timeouts, rate limits kill company analysis immediately. Mitigation: transport-level retry wrapper in M13. |
 | Scrape takes too long | Medium | Scrape only liquid stocks weekly (~2,000). Monthly full scrape. Resume support handles interruptions. |
+| Silent error swallowing | Medium | Bare `catch {}` in company list fetch + agent parsers returning null without logging. Mitigation: fix in M13. |
 | Data staleness | Low | Screener.in data itself has filing latency. Weekly scrape is adequate for medium-term analysis. |
 | PostgreSQL disk usage | Low | ~5,300 rows/week x 100+ JSONB fields. ~50-100 MB/week. Manageable for years. |
 
@@ -733,8 +915,78 @@ Based on the first homelab pipeline run (20 companies, ~23 min), these improveme
 | Reduce Tier 1 to top+bottom 50 | ~$35/week | Fewer companies get full analysis |
 | Summarize AG1-3 outputs before AG4 | ~$10-15/week | Adds complexity, may lose nuance |
 
+### 14.7 Scoring Model Additions (M10)
+
+Add 8 new quantitative scoring models to Layer 1 (see §8.1.1 for full details). Highest impact items: DCF intrinsic value replaces P/E-only valuation, Piotroski F-Score adds academic-backed quality signal, Magic Formula combines cheapness + quality in a single rank. All models use data already available in flattenV2 or price_history — no new scraping required (except ROIC which needs a flattenV2 enrichment addition).
+
+### 14.8 LLM Pipeline v3 (M11)
+
+Expand AG1 coverage to all ~5,300 companies (feasible at $0 with local Qwen), pre-parse AG1-3 outputs into structured summaries before feeding to AG4 (reduces tokens ~30%), add retry-with-feedback on JSON parse failures, and integrate news sentiment as a new data source for AG4 context. See §8.2.1 for details.
+
+### 14.9 Backtesting Improvements
+
+Current backtesting validates absolute returns. Next phase adds: benchmark comparison against Nifty 50/500 (alpha measurement), factor attribution (which scoring dimensions drive returns), and position sizing simulation (Kelly criterion or equal-weight comparison). These feed into composite weight optimization — use backtest results to tune dimension weights empirically rather than relying solely on first-principles reasoning.
+
+### 14.10 Banking Sector Scoring
+
+Banking/NBFC companies have fundamentally different financial structures (no "revenue" in the traditional sense, NIM instead of OPM, NPA instead of D/E). Current sector adjustments tweak thresholds but still use the same metrics. A separate scoring path for financials would use NIM, NPA, CASA ratio, CAR, and provision coverage as primary metrics — significantly improving signal quality for the ~800 listed financial companies.
+
+### 14.11 Testing Foundation (M12) — Highest Priority
+
+The codebase has **zero automated tests** (0% coverage across ~6,950 lines). Every deploy goes to production unvalidated. This is the single highest-ROI improvement.
+
+**Phase 1 — Framework + Critical Path** (highest impact):
+- Set up Vitest with ESM/TypeScript config. Add `npm test` script to root and all packages.
+- Test the money path first: `disqualifier.ts` (8 disqualifiers, boundary values), `metric-scorer.ts` (threshold edges), `parseIndianNumber` (Indian number formats, malformed input), `cagr()` / `consistencyCount()` (math correctness).
+- HTML parser regression tests using real Screener.in page fixtures.
+- Add `npm test` + `npm run typecheck` to GitHub Actions CI before the Docker build step.
+
+**Phase 2 — Expand Coverage**:
+- Framework evaluators: Buffett weight validation, Graham boundaries, Lynch classification logic, Pabrai risk combinations.
+- Post-validation rule tests (all 6 override rules).
+- LLM agent parser tests with mock responses (valid JSON, malformed, missing fields).
+- flattenV2 snapshot tests (known JSONB → expected 60+ metrics).
+
+**Phase 3 — Integration**:
+- Integration test: seed DB → run Layer 1 → verify classification distribution.
+- Pipeline smoke test: mock HTTP + mock LLM → full pipeline completes without error.
+
+### 14.12 Error Handling Hardening (M13)
+
+**Process-level resilience:**
+- Add `process.on('unhandledRejection')` and `process.on('uncaughtException')` to both CLI entry points (`scraper/src/index.ts`, `analyzer/src/index.ts`). Log the error, exit with code 1.
+- Custom error hierarchy: `PipelineError` base class with `ScraperError`, `AnalysisError`, `LLMError`, `ConfigError` subclasses. Enables programmatic error discrimination (retry LLMTimeoutError but not LLMParseError).
+
+**Transport-level LLM retry:**
+- Wrap LLM API calls with retry logic (2 retries, exponential backoff). Retry on 429/502/503/timeout. Don't retry on 400/401/parse failures.
+- Separate from the existing "retry on parse failure" item in M11 — this is transport-level, that is application-level.
+
+**DB and I/O hardening:**
+- Wrap critical DB queries (`engine.ts`, `analysis-run.ts`, `walk-forward.ts`) in try/catch with contextual messages ("Failed to load scrape run #5: connection refused").
+- Guard rubric/config file loading with try/catch and actionable messages ("scoring-rubric.json not found at {path}").
+- Fix silent `catch {}` in `fetch-company-list.ts` — log failed search queries at warn level.
+- Log actual parse errors in agent parsers before returning null (currently invisible).
+- Type-safe catch: `err instanceof Error ? err.message : String(err)` in all `.catch()` handlers.
+
+### 14.13 Logging & Observability Upgrades (M13)
+
+**Structured logging:**
+- Use the logger's existing `data` parameter (currently unused everywhere) for machine-parseable fields: `logger.info('company scored', { company: 'RELIANCE', composite: 78.5, classification: 'potential_long', tier: 1 })`.
+- Migrate 107 `console.log` calls in CLI entry points to `logger.info` (or a separate `ui.print()` helper for user-facing output that bypasses level filtering).
+
+**Correlation and tracing:**
+- Generate a UUID correlation ID at pipeline start. Thread it through logger calls so a single company's journey (scrape → enrich → score → LLM → save) can be traced end-to-end.
+
+**Performance visibility:**
+- Per-agent LLM timing: `logger.info('agent complete', { agent: 'AG1', company: 'RELIANCE', durationMs: 1234, inputTokens: 2800, outputTokens: 450 })`.
+- Per-company scrape duration (not just aggregate total).
+- DB query timing for slow-query detection.
+
+**Debug coverage:**
+- Expand from 5 `logger.debug()` calls to meaningful coverage: scoring decisions, framework evaluation steps, LLM prompt construction, enrichment calculations. Invisible when `LOG_LEVEL=info`, invaluable when troubleshooting with `LOG_LEVEL=debug`.
+
 ---
 
 *Last updated: 2026-03-02*
-*Version: 2.1*
+*Version: 2.3*
 *Reference docs: docs/00-PROJECT-OVERVIEW.md, docs/01-TASK1-SCRAPER.md, docs/02-TASK2-PRINCIPLES.md, docs/03-TASK3-ANALYSIS.md*

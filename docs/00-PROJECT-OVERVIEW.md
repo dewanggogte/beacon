@@ -46,14 +46,16 @@ An automated pipeline to identify high-potential and high-risk stocks in the Ind
 
 ## Tech Stack
 
+> **Note:** This was the original spec. See `PRD.md` for the current, authoritative tech decisions.
+
 | Component | Technology | Rationale |
 |-----------|------------|-----------|
-| Scraper | Node.js + Puppeteer (puppeteer-extra + stealth plugin) | Best stealth ecosystem for anti-detection |
-| Database | PostgreSQL | Structured, queryable, supports complex joins and time-series |
-| LLM Analysis | Qwen 4B (locally hosted) | Privacy, no API costs, runs on home server |
-| Web Dashboard | Next.js or Astro + React | Familiar stack, SSR for fast loads |
-| Scheduling | Cron (systemd timers) | Native Linux, reliable, no extra dependencies |
-| Infrastructure | Home Kubernetes cluster | Already running on Mukul's home server |
+| Scraper | Node.js + native fetch + Cheerio | HTTP-first (no headless browser). Screener.in has no Cloudflare/anti-bot |
+| Database | PostgreSQL 17 + Drizzle ORM | Structured queries, JSONB for flexible data, type-safe schema-as-code |
+| LLM Analysis | Anthropic Claude API OR local Qwen 3.5 (35B) via SGLang | Dual-provider: cloud (Haiku/Sonnet) for quality, local for cost. 4-agent architecture |
+| Web Dashboard | Next.js 15 + Tailwind CSS 4 | Bloomberg-terminal aesthetic, Server Components |
+| Scheduling | K8s CronJob | Runs on homelab K3s cluster |
+| Infrastructure | K3s cluster, ArgoCD, CNPG PostgreSQL | Deployed at `screener.nikamma.in` (internal) |
 
 ---
 
@@ -70,55 +72,23 @@ An automated pipeline to identify high-potential and high-risk stocks in the Ind
 
 ## Project Structure
 
+> **Note:** This was the original spec. See `PRD.md` section 6 for the current, authoritative structure.
+
 ```
-indian-stock-screener/
-├── README.md                          # Quick start, how to run
-├── docs/
-│   ├── 00-PROJECT-OVERVIEW.md         # This file
-│   ├── 01-TASK1-SCRAPER.md            # Scraper requirements
-│   ├── 02-TASK2-PRINCIPLES.md         # Investment principles research requirements
-│   ├── 03-TASK3-ANALYSIS.md           # Analysis & ranking requirements
-│   ├── ideology.md                    # Investment ideology & philosophy
-│   ├── tech-decisions.md              # Why we chose each technology
-│   ├── anti-detection-playbook.md     # Bot evasion strategies
-│   └── data-dictionary.md             # Every field we scrape and what it means
+screener-automation/
+├── PRD.md                             # Living design document (authoritative)
+├── docs/                              # Original spec documents (historical)
 ├── packages/
-│   ├── scraper/                       # Task 1: Puppeteer scraper
-│   │   ├── src/
-│   │   │   ├── browser/               # Browser setup, stealth config
-│   │   │   ├── scrapers/              # Per-page scraping logic
-│   │   │   ├── human/                 # human_click, human_type, human_scroll
-│   │   │   ├── anti-detect/           # Proxy rotation, fingerprint management
-│   │   │   └── db/                    # Database write layer
-│   │   ├── package.json
-│   │   └── tsconfig.json
-│   ├── analyzer/                      # Task 3: LLM-based analysis
-│   │   ├── src/
-│   │   │   ├── scoring/               # Quantitative scoring engine
-│   │   │   ├── llm/                   # Qwen integration for qualitative analysis
-│   │   │   └── output/                # Report generation
-│   │   └── package.json
-│   └── dashboard/                     # Web dashboard
-│       ├── src/
-│       └── package.json
-├── principles/                        # Task 2 output
-│   ├── investment-principles.md       # Curated principles document
-│   ├── scoring-rubric.json            # Machine-readable scoring criteria
-│   ├── red-flags.md                   # What to avoid
-│   └── investor-profiles.md           # Per-investor philosophy summaries
-├── k8s/                               # Kubernetes manifests
-│   ├── scraper-cronjob.yaml
-│   ├── postgres.yaml
-│   ├── dashboard-deployment.yaml
-│   └── analyzer-job.yaml
-├── scripts/
-│   ├── setup-db.sql                   # Database schema
-│   ├── run-pipeline.sh                # Orchestrates Task 1 → Task 3
-│   └── healthcheck.sh                 # Verify all services running
-└── docker/
-    ├── Dockerfile.scraper
-    ├── Dockerfile.analyzer
-    └── Dockerfile.dashboard
+│   ├── shared/                        # @screener/shared (DB, types, config, logger)
+│   ├── scraper/                       # @screener/scraper (HTTP + Cheerio)
+│   ├── analyzer/                      # @screener/analyzer (scoring, frameworks, LLM, backtest, macro)
+│   └── dashboard/                     # @screener/dashboard (Next.js 15)
+├── principles/                        # Scoring rubric + framework configs
+│   ├── scoring-rubric.json
+│   └── frameworks/                    # Buffett, Graham, Lynch, Pabrai configs
+├── scripts/                           # Test & utility scripts
+├── Dockerfile                         # Multi-stage (3 entrypoint modes)
+└── .github/workflows/                 # CI/CD → GHCR → ArgoCD
 ```
 
 ---
@@ -141,40 +111,32 @@ indian-stock-screener/
 
 ## Weekly Pipeline Flow
 
+> **Note:** Timings updated to reflect actual implementation.
+
 ```
-Saturday 2:00 AM IST ─── Scraper starts (markets closed, data stable)
-                    │
-                    ├── Phase 1: Get company list (all companies page)
-                    ├── Phase 2: Scrape each company detail page
-                    │   ├── Financial ratios
-                    │   ├── Quarterly results
-                    │   ├── Profit & Loss
-                    │   ├── Balance Sheet
-                    │   ├── Cash Flow
-                    │   ├── Shareholding pattern
-                    │   └── Peer comparison
-                    ├── Phase 3: Store in PostgreSQL with timestamp
-                    │
-Saturday ~8:00 AM ──── Scraper complete
-                    │
-                    ├── Phase 4: Run quantitative scoring (code-based)
-                    ├── Phase 5: Run LLM analysis on top candidates (Qwen 4B)
-                    ├── Phase 6: Generate ranked output
-                    │
-Saturday ~10:00 AM ─── Dashboard updated with new data
-                    │
-                    └── Notification sent (optional)
+Saturday ~2:00 AM IST ── Scraper starts (markets closed, data stable)
+    ├── Fetch company list (search API, ~5,300 companies)
+    ├── Scrape company detail pages (HTTP + Cheerio, ~18-24 hrs)
+    ├── Store snapshots in PostgreSQL (JSONB)
+    │
+~Next day ── Scraper completes
+    ├── Layer 1: Quantitative scoring + 4 framework evaluators (<5 min)
+    ├── Layer 2: Multi-agent LLM (4 agents, tiered, 2-8 hrs depending on provider)
+    ├── Post-validation cross-checks
+    ├── Generate reports + save to DB
+    │
+Sunday ── Dashboard updated at screener.nikamma.in
 ```
 
 ---
 
 ## Risk & Limitations
 
-- **Scraper fragility**: Screener.in may change its HTML structure at any time. Build selectors that are resilient and log warnings on structural changes.
-- **Bot detection**: Weekly cadence reduces risk, but Screener.in may still detect and block. The anti-detection system must be robust. See `anti-detection-playbook.md`.
-- **LLM hallucination**: Qwen 4B is a small model. It may produce incorrect analysis. Always cross-reference LLM output with quantitative scores. The LLM is advisory, not decisive.
-- **Data staleness**: Screener.in data itself has latency (typically updated within days of filings). Our weekly scrape adds another layer. For time-sensitive decisions, manual verification is needed.
-- **NOT financial advice**: This is a research and analysis tool. All investment decisions are the user's responsibility.
+- **Scraper fragility**: Screener.in may change its HTML structure at any time. Modular parsers per section. Validation warns on missing fields.
+- **Bot detection**: Weekly cadence + conservative rate limiting + realistic headers. Playwright fallback available but not needed so far.
+- **LLM hallucination**: Mitigated by post-validation layer that cross-checks LLM claims against quantitative data. LLM is advisory (+/-15 points max), not decisive.
+- **Data staleness**: Screener.in data has filing latency. Weekly scrape is adequate for medium-term (6-12 month) analysis.
+- **NOT financial advice**: This is a personal research and analysis tool. All investment decisions are the user's responsibility.
 
 ---
 

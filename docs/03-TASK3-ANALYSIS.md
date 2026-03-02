@@ -198,92 +198,42 @@ These thresholds should be configurable and tuned based on the distribution of s
 
 ---
 
-## Layer 2: LLM Qualitative Analysis (Qwen 4B)
+## Layer 2: LLM Qualitative Analysis
 
-### Scope
+> **Note:** This was the original spec. See `PRD.md` section 8.2 for the current, authoritative LLM architecture.
 
-Only run LLM analysis on:
-- **Top 200 by composite score** (long candidates worth deeper analysis)
-- **Bottom 200 by composite score** (short/avoid candidates to confirm)
-- **Any companies that just crossed classification boundaries** since last week (newly promoted/demoted)
+### Current Architecture (as-built)
 
-This limits LLM calls to ~400-500 per run, which is manageable for a local 4B model.
+**4-Agent Multi-Agent System** with tiered execution and dual LLM provider support:
 
-### LLM Integration
+| Agent | Role | Key Features |
+|-------|------|-------------|
+| AG1 Fundamentals | Financial trends, valuation, earnings quality | Structured 5-step CoT, peer comparison context |
+| AG2 Governance | Promoter behavior, institutional confidence | Structured 4-step CoT, 12-quarter shareholding analysis |
+| AG3 Risk | Downside scenarios, Pabrai risk hierarchy | Structured 5-step CoT, devil's advocate mandate (min 2 risks) |
+| AG4 Synthesis | CIO combining AG1-3 into investment thesis | Structured 5-step CoT, macro regime context, conviction calibration (7 gates) |
 
-```typescript
-// Connect to locally running Qwen 4B
-// Options: Ollama, vLLM, llama.cpp server
-// Recommend: Ollama for simplicity on home server
+**Providers** (set via `LLM_PROVIDER` env var):
+- `anthropic`: Claude Haiku (AG1-3) + Sonnet (AG4), with ephemeral prompt caching
+- `local`: Qwen 3.5-35B via SGLang/vLLM, same model for all agents, thinking mode disabled
 
-const OLLAMA_URL = 'http://localhost:11434/api/generate';
+**Tiered Execution:**
+- Tier 1 (top+bottom 100): Full 4-agent (AG1→AG4)
+- Tier 2 (top 500 minus Tier 1): AG1 only
+- Tier 3 (rest): No LLM
 
-interface LLMAnalysis {
-  trendNarrative: string;       // "Revenue growing but margins declining due to..."
-  riskFactors: string[];        // ["High dependence on single client", "Commodity price exposure"]
-  catalysts: string[];          // ["New product launch in Q2", "Sector tailwinds from govt policy"]
-  qualitativeAdjustment: number; // -10 to +10 adjustment to composite score
-  confidence: 'high' | 'medium' | 'low';
-  reasoning: string;            // Why the adjustment
-}
-```
+**Post-LLM Validation:** `post-validation.ts` cross-checks LLM claims against quantitative data. Overrides contradictions (e.g., "improving" trend with declining revenue) and logs warnings.
 
-### Prompt Engineering for Qwen 4B
-
-Since Qwen 4B is a smaller model, prompts must be:
-- **Specific and structured** — tell it exactly what to output
-- **Grounded in data** — provide the actual numbers, don't ask it to recall
-- **JSON-formatted output** — easier to parse programmatically
-- **One company at a time** — don't batch
-
-```typescript
-const prompt = `You are a value investing analyst evaluating Indian stocks. 
-Analyze the following company based on the data provided.
-
-Company: ${companyName} (${sector})
-Key Metrics:
-- PE: ${pe}, ROE: ${roe}%, ROCE: ${roce}%
-- Debt/Equity: ${de}, Current Ratio: ${cr}
-- 5Y Revenue CAGR: ${revGrowth}%, 5Y Profit CAGR: ${profitGrowth}%
-- Promoter Holding: ${promoterHolding}%, Pledge: ${promoterPledge}%
-- Free Cash Flow (last 3 years): ${fcf}
-- Operating Margin Trend: ${marginTrend}
-
-Quantitative Score: ${compositeScore}/100
-
-Quarterly Revenue Trend (last 8 quarters): ${quarterlyRevenue}
-Quarterly Profit Trend (last 8 quarters): ${quarterlyProfit}
-
-Respond in this exact JSON format:
-{
-  "trend_narrative": "2-3 sentence analysis of the trend in fundamentals",
-  "risk_factors": ["risk1", "risk2", "risk3"],
-  "catalysts": ["catalyst1", "catalyst2"],
-  "qualitative_adjustment": <number from -10 to +10>,
-  "confidence": "high" | "medium" | "low",
-  "reasoning": "1-2 sentences explaining the adjustment"
-}
-
-Rules:
-- Be conservative. When in doubt, adjust downward.
-- Flag any disconnects between reported profits and cash flow.
-- Consider sector-specific risks.
-- Do not hallucinate — only use the data provided above.`;
-```
-
-### Handling LLM Failures
-
-- If Qwen fails to return valid JSON, retry up to 3 times
-- If still failing, skip LLM analysis for that company (Layer 1 score stands alone)
-- Log all failures for review
-- Never let LLM failure block the pipeline
+**Parse Failure Handling:** Three counters (completed/failed/parseFailures). Only successful parse increments completed. Failures logged with company name.
 
 ### LLM Adjustment Guardrails
 
-- Maximum adjustment: ±10 points on the 0-100 composite score
-- LLM cannot override automatic disqualifiers
-- LLM adjustment is logged with full reasoning for audit trail
-- If LLM confidence is "low", reduce adjustment by 50%
+- Max adjustment: +/-10 (Tier 2 AG1), +/-15 (Tier 1 AG4 synthesis)
+- Cannot override automatic disqualifiers
+- Low/none conviction -> adjustment halved
+- Post-validation overrides contradictory claims
+- LLM failure -> Layer 1 score stands alone
+- 3 retries per company, then skip
 
 ---
 
