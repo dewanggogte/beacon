@@ -18,7 +18,7 @@ Automated Indian stock market analysis pipeline. Scrapes financial data from [Sc
 
 ### Prerequisites
 
-- Node.js 22+
+- Node.js 25+
 - PostgreSQL 17
 - Python 3 (optional, for historical price data)
 
@@ -136,9 +136,22 @@ Container image: `ghcr.io/dewanggogte/screener-automation:latest`
 | Dashboard | Next.js 15 + Tailwind CSS 4 |
 | Infrastructure | Docker, K3s, ArgoCD, CNPG PostgreSQL |
 
+## Status & roadmap
+
+Current version: **2.3**. The core pipeline (scrape → score → LLM → dashboard) is fully operational on homelab.
+
+**Next milestones:**
+- **M10**: Scoring model upgrades — DCF intrinsic value, Piotroski F-Score, Magic Formula, Altman Z-Score, and 4 more quantitative models
+- **M11**: LLM pipeline v3 — expand AG1 to all ~5,300 companies, pre-parse AG1-3 for AG4, retry on parse failure
+- **M12**: Testing foundation — Vitest setup, CI quality gate, tests for disqualifiers/scorers/parsers/math (currently **0% test coverage**)
+- **M13**: Error handling & logging hardening — custom error hierarchy, LLM transport retry, structured logging, correlation IDs
+
+See [PRD.md](PRD.md) sections 8.1.1, 8.2.1, 8.4, and milestones M10-M13 for full details.
+
 ## Documentation
 
-- [ARCHITECTURE.md](docs/ARCHITECTURE.md) -- System design, components, LLM agents
+- [ARCHITECTURE.md](ARCHITECTURE.md) -- System design, components, LLM agents, planned additions
 - [INFO_FLOW.md](INFO_FLOW.md) -- Data flow from scrape to dashboard, agent data packs, post-validation
 - [RUNNING.md](RUNNING.md) -- All commands, scenarios, environment variables, troubleshooting
-- [PRD.md](PRD.md) -- Full product requirements document
+- [OPS.md](OPS.md) -- Operations guide: local, Docker, homelab deployment and debugging
+- [PRD.md](PRD.md) -- Full product requirements document (v2.3)

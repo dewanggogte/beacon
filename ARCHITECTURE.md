@@ -152,7 +152,10 @@ analyzer/src/
 │   └── pabrai.ts             6 risk factors (leverage, simplicity, OCF)
 │
 ├── llm/                      LAYER 2: MULTI-AGENT LLM
-│   ├── anthropic-client.ts   Claude API client with prompt caching
+│   ├── llm-client.ts            Provider interface
+│   ├── create-llm-client.ts     Factory: Anthropic or local Qwen
+│   ├── anthropic-client.ts      Claude API client with prompt caching
+│   ├── openai-compatible-client.ts  Local LLM (SGLang/vLLM) client
 │   ├── qualitative-analyzer.ts  Multi-agent orchestrator (tiered execution)
 │   └── agents/
 │       ├── agent-types.ts        Shared types for agent I/O
@@ -160,7 +163,8 @@ analyzer/src/
 │       ├── fundamentals-agent.ts AG1: Trend, earnings quality, growth
 │       ├── governance-agent.ts   AG2: Promoter behavior, FII/DII signals
 │       ├── risk-agent.ts         AG3: Leverage, cyclical risk, tail risk
-│       └── synthesis-agent.ts    AG4: Combines AG1-3 → thesis + conviction
+│       ├── synthesis-agent.ts    AG4: Combines AG1-3 → thesis + conviction
+│       └── post-validation.ts    Cross-check LLM output vs quant data
 │
 ├── macro/                    MACRO OVERLAY
 │   ├── regime-classifier.ts  4-quadrant: goldilocks/reflation/stagflation/deflation
@@ -214,6 +218,8 @@ company_snapshots (JSONB)
 
 ### Multi-Agent LLM Architecture
 
+Dual provider support: `LLM_PROVIDER=anthropic` (Haiku for AG1-3, Sonnet for AG4, prompt caching) or `LLM_PROVIDER=local` (Qwen 3.5-35B via SGLang/vLLM, $0 cost).
+
 ```
          ┌─────────────────────────────────────────┐
          │         DATA PACK BUILDER               │
@@ -233,7 +239,12 @@ company_snapshots (JSONB)
                  │    AG4     │  Receives: AG1-3 JSON outputs
                  │  Synthesis │  + all framework scores
                  │   Sonnet   │  + Lynch category guidance
-                 └────────────┘
+                 └─────┬──────┘  + macro regime context
+                       │
+                 ┌─────v──────┐
+                 │   Post-    │  Cross-checks LLM claims vs
+                 │ Validation │  quant data, overrides
+                 └─────┬──────┘  contradictions
                        │
                  investment_thesis + conviction + adjustment
 ```
@@ -306,7 +317,60 @@ principles/
 | TypeScript ESM | Strong types for financial data, native ESM for modern tooling |
 | Native fetch + Cheerio | Screener.in is server-rendered HTML, no JS challenges |
 | PostgreSQL + Drizzle | JSONB for 13yr financial data, typed queries, studio UI |
-| Anthropic Claude | Prompt caching reduces cost 90%, multi-agent for specialization |
+| Anthropic Claude or Qwen 3.5 | Dual-provider LLM. Prompt caching (Anthropic), $0 cost (local) |
 | Next.js 15 | Server Components for DB queries, App Router, force-dynamic |
 | Tailwind CSS 4 | Custom Bloomberg theme via CSS variables, minimal bundle |
 | yfinance (Python) | Free historical prices, NSE/BSE support, no API key |
+
+## Planned: Scoring Model Upgrades (M10)
+
+New quantitative models to be added to Layer 1, ordered by expected impact:
+
+| Model | What It Adds |
+|-------|-------------|
+| DCF Intrinsic Value | 10-year DCF using owner earnings, 3-tier discount rates, margin of safety % |
+| Reverse DCF | Solve for implied growth rate from current price — flags overpriced stalwarts |
+| Piotroski F-Score | 9-point binary quality score. All input data already in flattenV2 |
+| Earnings Yield + FCF Yield | EBIT/EV and FCF/EV — superior to P/E for cross-sector comparison |
+| Price Momentum | 6m/12m returns from `price_history`. "Trending value" strategy |
+| Quarterly Acceleration | QoQ revenue/profit growth acceleration — leading indicator |
+| Greenblatt Magic Formula | Combined earnings yield + ROIC rank |
+| Altman Z-Score | Bankruptcy prediction. Z < 1.8 = distress zone → potential disqualifier |
+
+Additional metrics: Beneish M-Score (earnings manipulation), ROIC (return on invested capital).
+
+## Planned: LLM Pipeline v3 (M11)
+
+| Enhancement | Description |
+|-------------|-------------|
+| Expand AG1 to all companies | ~5,300 companies with local Qwen at $0. ~4-6 hours |
+| Pre-parse AG1-3 for AG4 | Structured summaries instead of raw JSON. Reduces tokens ~30% |
+| LLM retry on parse failure | 2 retries with "invalid JSON" nudge on parse failure |
+| News sentiment | RSS/Google News headlines fed into AG4 for temporal context |
+
+## Pipeline Resilience (M12 + M13)
+
+A March 2026 audit identified systemic gaps. Key findings:
+
+### Testing: Zero Coverage
+
+No test framework, no test files, no CI quality gates. 0% coverage across ~6,950 lines. Every push deploys to production unvalidated. Planned: Vitest setup, test the money path first (disqualifiers, scorers, parsers, math utilities), HTML fixture regression tests, CI gate before deploy.
+
+### Error Handling: 8 Gaps
+
+| Gap | Severity |
+|-----|----------|
+| No `process.on('unhandledRejection')` in entry points | High |
+| DB queries unwrapped — raw stack traces on failure | High |
+| No LLM transport-level retry (502, timeout, rate limit) | High |
+| Silent `catch {}` in company list fetch | Medium |
+| Agent parse errors swallowed (return null, no log) | Medium |
+| Config file loading unprotected | Medium |
+| No custom error hierarchy (only BlockedError/CaptchaError exist) | Low |
+| Error type erasure in `.catch()` handlers | Low |
+
+Planned: custom error hierarchy (`PipelineError` → `ScraperError`, `AnalysisError`, `LLMError`, `ConfigError`), LLM retry wrapper, contextual DB error handling, type-safe catch.
+
+### Logging: Inconsistent
+
+107 `console.log` calls bypass the logger entirely. Structured data parameter exists but is never used. Only 5 `logger.debug()` calls across 68 files. No correlation IDs, no per-agent timing. Planned: migrate console.log to logger, structured fields, pipeline-scoped correlation IDs, per-agent LLM timing.

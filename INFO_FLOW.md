@@ -473,6 +473,42 @@ Manual entry (CLI) → macro_snapshots table
                    └────────────────────────┘
 ```
 
+## Planned: Additional Scoring Models in Layer 1
+
+The following models will be added to the scoring engine flow between `flattenV2()` and composite scoring:
+
+```
+flattenV2() output (60+ metrics)
+        │
+        ├──> EXISTING: scoreDimension() x5 + evaluateAllFrameworks()
+        │
+        ├──> NEW: dcfIntrinsicValue()      Owner earnings DCF, 3-tier discount rates
+        │         → intrinsic_value, margin_of_safety_%
+        │
+        ├──> NEW: reverseDcf()             Solve for implied growth at current price
+        │         → implied_growth_rate (>25% for stalwart = overpriced)
+        │
+        ├──> NEW: piotrosikFScore()        9-point binary quality (from existing data)
+        │         → f_score 0-9
+        │
+        ├──> NEW: earningsYield()          EBIT/EV and FCF/EV
+        │         → earnings_yield, fcf_yield
+        │
+        ├──> NEW: priceMomentum()          6m/12m returns from price_history
+        │         → momentum_6m, momentum_12m
+        │
+        ├──> NEW: quarterlyAcceleration()  QoQ revenue/profit growth acceleration
+        │         → revenue_accel, profit_accel
+        │
+        ├──> NEW: magicFormulaRank()       Earnings yield + ROIC combined rank
+        │         → magic_formula_rank (1 = best)
+        │
+        └──> NEW: altmanZScore()           Bankruptcy prediction (5 ratios)
+                  → z_score (<1.8 = distress → disqualifier candidate)
+```
+
+All models feed into a revised composite scoring that integrates these signals with the existing 5-dimension + 4-framework scores.
+
 ## Weekly Comparison Flow
 
 ```
@@ -493,3 +529,46 @@ computeWeeklyChanges()
        score_change + classification_change columns
        + weekly markdown report
 ```
+
+## Pipeline Error Flow (Current Gaps)
+
+A March 2026 audit identified how errors propagate (or don't) through the pipeline:
+
+```
+Scraper error (HTTP 4xx/5xx)
+    │
+    ├── BlockedError/CaptchaError → caught, specific backoff logic ✓
+    ├── HTTP 404/410 (permanent) → retried 3x wastefully ✗ (M8 fix planned)
+    └── 10+ consecutive failures → scrape halted ✓
+
+flattenV2 error (malformed JSONB)
+    │
+    ├── null/undefined record → NOW HANDLED (v2.3 fix) ✓
+    ├── TTM-only annual P&L → NOW HANDLED (v2.3 fix) ✓
+    └── Missing JSONB columns → gracefully returns null fields ✓
+
+Scoring error
+    │
+    └── Currently: uncaught, kills entire pipeline ✗
+        Planned (M13): wrap in try/catch, skip company, log warning
+
+LLM error
+    │
+    ├── API 502/timeout → kills company analysis, no retry ✗ (M13)
+    ├── Rate limit (429) → Anthropic SDK retries automatically ✓
+    ├── Parse failure → returns null, counter incremented ✓
+    │   BUT: actual error not logged, just "parseFailure++" ✗ (M13)
+    └── All agents fail for company → Layer 1 score stands ✓
+
+DB error
+    │
+    └── Currently: raw Drizzle stack trace, pipeline crash ✗
+        Planned (M13): contextual try/catch, graceful degradation
+
+Process-level
+    │
+    ├── unhandledRejection → silent crash, no log ✗ (M13)
+    └── uncaughtException → silent crash, no log ✗ (M13)
+```
+
+See PRD.md §8.4 for the full resilience audit and M12-M13 for the improvement plan.

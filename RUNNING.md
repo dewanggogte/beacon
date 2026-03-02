@@ -10,11 +10,14 @@ Before running anything:
 # 1. PostgreSQL must be running
 brew services start postgresql@17
 
+# psql may not be on your PATH by default:
+export PATH="/opt/homebrew/opt/postgresql@17/bin:$PATH"
+
 # 2. Database must exist with tables
 createdb screener          # first time only
 npm run db:migrate         # creates/updates all 7 tables
 
-# 3. Project must be built
+# 3. Project must be built (requires Node.js 25+)
 npm install                # first time or after dependency changes
 npm run build              # compiles all TypeScript packages
 
@@ -550,6 +553,21 @@ The log shows warnings like `[PostValidation] AG1 override: trend_assessment "im
 
 The overrides are logged as warnings for transparency. No action needed unless you see excessive overrides (>30% of companies), which may indicate a model quality issue.
 
+### "Cannot read properties of undefined (reading 'OPM %')" in Layer 1
+
+```
+Pipeline failed: Cannot read properties of undefined (reading 'OPM %')
+    at num (flatten-v2.ts:20:13)
+```
+
+A company has `annualPl` with only a TTM entry and no real yearly data. After slicing off the TTM row, the array is empty, and `plData[0]` is undefined. **Fixed in v2.3** — flattenV2 now guards `plData.length > 0` and `num()` handles undefined records.
+
+If you see this on an older version, update and rebuild:
+
+```bash
+git pull && npm run build
+```
+
 ### "Scrape aborted: 10 consecutive failures"
 
 The scraper detected too many consecutive failures, likely meaning the IP is temporarily blocked.
@@ -642,6 +660,58 @@ npx tsx scripts/compare-providers.ts    # Compare Anthropic vs local output qual
 
 ---
 
+## Scenario 9: Re-Run Analysis Only on Homelab
+
+If the scraper completed but analysis failed (e.g., a bug in Layer 1), you don't need to re-scrape. The scrape data is already in the database.
+
+### Verify scrape data exists
+
+```bash
+# Port-forward the CNPG database
+kubectl port-forward -n postgres svc/postgres-rw 5433:5432
+
+# Check the scrape run (in another terminal)
+export PATH="/opt/homebrew/opt/postgresql@17/bin:$PATH"
+psql -h localhost -p 5433 -U screener -d screener \
+  -c "SELECT id, status, successful, failed FROM scrape_runs ORDER BY id DESC LIMIT 3;"
+```
+
+The password is in the SealedSecret. Extract it:
+
+```bash
+kubectl get secret -n screener-automation screener-secrets \
+  -o jsonpath='{.data.DATABASE_URL}' | base64 -d
+# Password is between : and @ in the URL
+```
+
+### Re-run analysis only
+
+Create a one-off job using the analysis-only pipeline mode:
+
+```bash
+kubectl create job screener-analyze-manual \
+  --from=cronjob/screener-pipeline \
+  -n screener-automation \
+  -- pipeline:analyze
+
+# Watch progress
+kubectl logs -f job/screener-analyze-manual -n screener-automation
+
+# Clean up
+kubectl delete job screener-analyze-manual -n screener-automation
+```
+
+Or for Layer 1 only (no LLM, fastest):
+
+```bash
+kubectl create job screener-quick-manual \
+  --from=cronjob/screener-pipeline \
+  -n screener-automation \
+  -- pipeline:quick
+```
+
+---
+
 ## Quick Reference
 
 | Task | Command |
@@ -668,3 +738,5 @@ npx tsx scripts/compare-providers.ts    # Compare Anthropic vs local output qual
 | Test single company E2E | `npx tsx scripts/test-adani-power.ts` |
 | Diagnose LLM | `npx tsx scripts/diagnose-llm.ts` |
 | Fetch historical prices | `python scripts/fetch-prices.py` |
+| Re-run analysis (homelab) | `kubectl create job screener-analyze-manual --from=cronjob/screener-pipeline -n screener-automation -- pipeline:analyze` |
+| Check scrape data (homelab) | `kubectl port-forward -n postgres svc/postgres-rw 5433:5432` then `psql -h localhost -p 5433 -U screener -d screener` |
