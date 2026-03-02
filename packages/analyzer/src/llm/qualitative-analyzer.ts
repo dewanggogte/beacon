@@ -96,13 +96,20 @@ export async function runQualitativeAnalysis(
   let completed = 0;
   let failed = 0;
   let parseFailures = 0;
+  const llmStartTime = Date.now();
+  const totalLlm = tier2.length + tier1.length;
 
   // Process Tier 2 (AG1 only)
-  for (const analysis of tier2) {
+  logger.info(`--- Tier 2: ${tier2.length} companies (AG1 only) ---`);
+  for (let i = 0; i < tier2.length; i++) {
+    const analysis = tier2[i]!;
     try {
       const enriched = enrichedMap.get(analysis.companyId);
       const fr = analysis.frameworkResults;
       if (!enriched || !fr) continue;
+
+      const companyStart = Date.now();
+      logger.info(`  [${i + 1}/${tier2.length}] T2 ${analysis.screenerCode} (rank #${analysis.rank})...`);
 
       const userMsg = buildFundamentalsDataPack(analysis, enriched, fr);
       const response = await client.generate(FUNDAMENTALS_SYSTEM_PROMPT, userMsg, {
@@ -140,9 +147,12 @@ export async function runQualitativeAnalysis(
         logger.warn(`AG1 parse failure for ${analysis.screenerCode}`);
       }
 
-      if ((completed + parseFailures) % 50 === 0) {
-        logger.info(`  LLM progress: ${completed + parseFailures}/${tier2.length + tier1.length}`);
-      }
+      const companyElapsed = ((Date.now() - companyStart) / 1000).toFixed(1);
+      const totalElapsed = ((Date.now() - llmStartTime) / 1000 / 60).toFixed(1);
+      const done = completed + failed + parseFailures;
+      const avgPerCompany = (Date.now() - llmStartTime) / done / 1000;
+      const remaining = ((totalLlm - done) * avgPerCompany / 60).toFixed(0);
+      logger.info(`  [${i + 1}/${tier2.length}] T2 ${analysis.screenerCode} done (${companyElapsed}s, adj=${analysis.llmAnalysis?.qualitativeAdjustment ?? 'N/A'}) | ${totalElapsed}min elapsed, ~${remaining}min remaining`);
     } catch (error) {
       failed++;
       logger.warn(`AG1 failed for ${analysis.screenerCode}: ${(error as Error).message}`);
@@ -150,13 +160,19 @@ export async function runQualitativeAnalysis(
   }
 
   // Process Tier 1 (full AG1-4)
-  for (const analysis of tier1) {
+  logger.info(`--- Tier 1: ${tier1.length} companies (full 4-agent) ---`);
+  for (let i = 0; i < tier1.length; i++) {
+    const analysis = tier1[i]!;
     try {
       const enriched = enrichedMap.get(analysis.companyId);
       const fr = analysis.frameworkResults;
       if (!enriched || !fr) continue;
 
+      const companyStart = Date.now();
+      logger.info(`  [${i + 1}/${tier1.length}] T1 ${analysis.screenerCode} (rank #${analysis.rank}, ${analysis.classification})...`);
+
       // AG1: Fundamentals
+      const ag1Start = Date.now();
       const fundUserMsg = buildFundamentalsDataPack(analysis, enriched, fr);
       const fundResponse = await client.generate(FUNDAMENTALS_SYSTEM_PROMPT, fundUserMsg, {
         model: agentModel,
@@ -164,8 +180,10 @@ export async function runQualitativeAnalysis(
         cacheSystemPrompt: true,
       });
       const fundParsed = parseFundamentalsOutput(fundResponse);
+      const ag1Sec = ((Date.now() - ag1Start) / 1000).toFixed(1);
 
       // AG2: Governance
+      const ag2Start = Date.now();
       const govUserMsg = buildGovernanceDataPack(analysis, enriched, fr);
       const govResponse = await client.generate(GOVERNANCE_SYSTEM_PROMPT, govUserMsg, {
         model: agentModel,
@@ -173,8 +191,10 @@ export async function runQualitativeAnalysis(
         cacheSystemPrompt: true,
       });
       const govParsed = parseGovernanceOutput(govResponse);
+      const ag2Sec = ((Date.now() - ag2Start) / 1000).toFixed(1);
 
       // AG3: Risk
+      const ag3Start = Date.now();
       const riskUserMsg = buildRiskDataPack(analysis, enriched, fr);
       const riskResponse = await client.generate(RISK_SYSTEM_PROMPT, riskUserMsg, {
         model: agentModel,
@@ -182,6 +202,7 @@ export async function runQualitativeAnalysis(
         cacheSystemPrompt: true,
       });
       const riskParsed = parseRiskOutput(riskResponse);
+      const ag3Sec = ((Date.now() - ag3Start) / 1000).toFixed(1);
 
       // Post-validate AG1 if parsed
       if (fundParsed) {
@@ -193,6 +214,7 @@ export async function runQualitativeAnalysis(
       }
 
       // AG4: Synthesis (receives AG1-3 outputs + macro context)
+      const ag4Start = Date.now();
       const synthSystemPrompt = buildSynthesisSystemPrompt(fr.lynch.category, regimeResult);
       const synthUserMsg = buildSynthesisDataPack(
         analysis, enriched, fr,
@@ -205,6 +227,7 @@ export async function runQualitativeAnalysis(
         cacheSystemPrompt: true,
       });
       const synthParsed = parseSynthesisOutput(synthResponse);
+      const ag4Sec = ((Date.now() - ag4Start) / 1000).toFixed(1);
 
       // Apply synthesis adjustment
       if (synthParsed) {
@@ -244,9 +267,14 @@ export async function runQualitativeAnalysis(
         logger.warn(`AG4 parse failure for ${analysis.screenerCode}`);
       }
 
-      if ((completed + parseFailures) % 10 === 0) {
-        logger.info(`  LLM progress: ${completed + parseFailures}/${tier2.length + tier1.length}`);
-      }
+      const companyElapsed = ((Date.now() - companyStart) / 1000).toFixed(1);
+      const totalElapsed = ((Date.now() - llmStartTime) / 1000 / 60).toFixed(1);
+      const done = completed + failed + parseFailures;
+      const avgPerCompany = (Date.now() - llmStartTime) / done / 1000;
+      const remaining = ((totalLlm - done) * avgPerCompany / 60).toFixed(0);
+      const conviction = synthParsed?.conviction ?? 'N/A';
+      const adj = analysis.llmAnalysis?.qualitativeAdjustment ?? 'N/A';
+      logger.info(`  [${i + 1}/${tier1.length}] T1 ${analysis.screenerCode} done (${companyElapsed}s: AG1=${ag1Sec}s AG2=${ag2Sec}s AG3=${ag3Sec}s AG4=${ag4Sec}s) adj=${adj} conv=${conviction} | ${totalElapsed}min elapsed, ~${remaining}min remaining`);
     } catch (error) {
       failed++;
       logger.warn(`Multi-agent failed for ${analysis.screenerCode}: ${(error as Error).message}`);
