@@ -33,6 +33,7 @@ async function main() {
   const skipLlm = getArg('skip-llm');
   const resume = getArg('resume');
   const limit = getArgValue('limit') ? Number(getArgValue('limit')) : undefined;
+  const runId = getArgValue('run') ? Number(getArgValue('run')) : undefined;
 
   // Step 1: Scrape
   if (!analyzeOnly) {
@@ -45,7 +46,7 @@ async function main() {
   if (!scrapeOnly) {
     logger.info('\n=== Step 2: Analysis ===');
     const { runAnalysis } = await import('../packages/analyzer/src/pipeline/analysis-run.js');
-    await runAnalysis({ skipLlm });
+    await runAnalysis({ skipLlm, scrapeRunId: runId });
   }
 
   const elapsed = ((Date.now() - startTime) / 1000).toFixed(0);
