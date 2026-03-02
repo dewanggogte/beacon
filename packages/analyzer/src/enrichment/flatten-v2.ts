@@ -16,7 +16,8 @@ import {
 type Snapshot = typeof schema.companySnapshots.$inferSelect;
 
 /** Safely get a numeric value from a JSONB record. */
-function num(record: Record<string, unknown>, key: string): number | null {
+function num(record: Record<string, unknown> | undefined, key: string): number | null {
+  if (!record) return null;
   const v = record[key];
   if (v === null || v === undefined) return null;
   const n = Number(v);
@@ -260,6 +261,7 @@ export function flattenV2(
     // Skip TTM entry if present (period === "TTM")
     const plData = annualPl[0]?.period === 'TTM' ? annualPl.slice(1) : annualPl;
 
+    if (plData.length > 0) {
     enriched.revenueHistory = extractSeries(plData, 'Sales');
     enriched.netProfitHistory = extractSeries(plData, 'Net Profit');
     enriched.epsHistory = extractSeries(plData, 'EPS in Rs');
@@ -327,6 +329,7 @@ export function flattenV2(
 
     // Earnings variance CV
     enriched.earningsVarianceCv = coefficientOfVariation(enriched.netProfitHistory);
+    } // end plData.length > 0
   }
 
   // --- Balance Sheet ---
