@@ -62,6 +62,9 @@ export default async function CompanyDetailPage({
   const isHighConviction = String(analysis?.convictionLevel) === 'high';
   const lynchClass = String(analysis?.lynchClassification ?? '');
   const convLevel = String(analysis?.convictionLevel ?? '');
+  const classSource = String(analysis?.classificationSource ?? 'quant');
+  const quantClass = String(analysis?.quantClassification ?? '');
+  const wasOverridden = classSource === 'ag4' && quantClass && quantClass !== analysis?.classification;
 
   return (
     <div className="max-w-5xl space-y-8">
@@ -88,10 +91,29 @@ export default async function CompanyDetailPage({
             value={Number(analysis.finalScore ?? 0).toFixed(0)}
             color={scoreColor(Number(analysis.finalScore ?? 0))}
           />
-          <StatCard
-            label="Classification"
-            value={(analysis.classification ?? 'N/A').toUpperCase().replace('_', ' ')}
-          />
+          <div className="bg-bg-card border border-border rounded-lg p-4">
+            <div className="text-text-muted text-xs uppercase tracking-wider flex items-center gap-2">
+              Classification
+              {classSource === 'ag4' && (
+                <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-bold bg-accent-cyan/20 text-accent-cyan normal-case tracking-normal">
+                  AG4
+                </span>
+              )}
+              {classSource === 'quant' && (
+                <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-bold bg-bg-secondary text-text-muted normal-case tracking-normal">
+                  QUANT
+                </span>
+              )}
+            </div>
+            <div className="text-xl font-bold mt-1">
+              {(analysis.classification ?? 'N/A').toUpperCase().replace('_', ' ')}
+            </div>
+            {wasOverridden && (
+              <div className="text-xs text-text-muted mt-1">
+                Quant: {quantClass.toUpperCase().replace('_', ' ')}
+              </div>
+            )}
+          </div>
           <StatCard label="Rank (Overall)" value={`#${analysis.rankOverall ?? '-'}`} />
           <StatCard label="Rank (Sector)" value={`#${analysis.rankInSector ?? '-'}`} />
         </div>

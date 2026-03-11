@@ -44,6 +44,10 @@ export async function saveAnalysisResults(
       frameworkDetails: fr ?? null,
       convictionLevel: analysis.convictionLevel ?? null,
       convictionReasons: analysis.convictionReasons ?? null,
+      // Dual evaluation attribution (v2.2)
+      quantClassification: analysis.quantClassification ?? analysis.classification,
+      quantConvictionLevel: analysis.quantConvictionLevel ?? analysis.convictionLevel ?? null,
+      classificationSource: analysis.classificationSource ?? 'quant',
     };
 
     await db

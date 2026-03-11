@@ -15,7 +15,8 @@ interface FundamentalsData {
   key_findings?: string[];
   red_flags?: string[];
   positive_signals?: string[];
-  adjustment?: number;
+  score?: number;
+  adjustment?: number; // Legacy compat
   confidence?: string;
   reasoning?: string;
 }
@@ -45,7 +46,10 @@ interface RiskData {
 
 interface SynthesisData {
   investment_thesis?: string;
-  final_adjustment?: number;
+  score?: number;
+  recommended_classification?: string;
+  classification_reasoning?: string;
+  final_adjustment?: number; // Legacy compat
   conviction?: string;
   conviction_reasoning?: string;
   time_horizon?: string;
@@ -124,6 +128,12 @@ export function AgentAnalysisPanel({ fundamentals, governance, risk, synthesis }
                 </div>
               )}
               <div className="flex flex-wrap gap-4 text-xs">
+                {syn.score != null && (
+                  <span>AG4 Score: <span className="text-accent-cyan font-bold">{syn.score}</span></span>
+                )}
+                {syn.recommended_classification && (
+                  <span>Classification: <span className="font-medium">{syn.recommended_classification.toUpperCase().replace('_', ' ')}</span></span>
+                )}
                 {syn.conviction && (
                   <span>Conviction: <span className={qualityColor(syn.conviction)}>{syn.conviction.toUpperCase()}</span></span>
                 )}
@@ -135,12 +145,10 @@ export function AgentAnalysisPanel({ fundamentals, governance, risk, synthesis }
                   }>{syn.signal_alignment.toUpperCase()}</span></span>
                 )}
                 {syn.time_horizon && <span className="text-text-secondary">Horizon: {syn.time_horizon}</span>}
-                {syn.final_adjustment != null && (
-                  <span>Adjustment: <span className={syn.final_adjustment > 0 ? 'text-accent-green' : syn.final_adjustment < 0 ? 'text-accent-red' : 'text-text-muted'}>
-                    {syn.final_adjustment > 0 ? '+' : ''}{syn.final_adjustment}
-                  </span></span>
-                )}
               </div>
+              {syn.classification_reasoning && (
+                <div className="text-xs text-text-secondary border-l-2 border-accent-cyan/30 pl-2">{syn.classification_reasoning}</div>
+              )}
               {syn.conviction_reasoning && (
                 <div className="text-xs text-text-secondary border-t border-border pt-2">{syn.conviction_reasoning}</div>
               )}
@@ -171,10 +179,8 @@ export function AgentAnalysisPanel({ fundamentals, governance, risk, synthesis }
                 {fund.earnings_quality && (
                   <span>Earnings Quality: <span className={qualityColor(fund.earnings_quality)}>{fund.earnings_quality.toUpperCase()}</span></span>
                 )}
-                {fund.adjustment != null && (
-                  <span>Adjustment: <span className={fund.adjustment > 0 ? 'text-accent-green' : fund.adjustment < 0 ? 'text-accent-red' : 'text-text-muted'}>
-                    {fund.adjustment > 0 ? '+' : ''}{fund.adjustment}
-                  </span></span>
+                {fund.score != null && (
+                  <span>AG1 Score: <span className="text-accent-cyan font-bold">{fund.score}</span></span>
                 )}
                 {fund.confidence && <span className="text-text-secondary">Confidence: {fund.confidence}</span>}
               </div>

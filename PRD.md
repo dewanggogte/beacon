@@ -69,7 +69,7 @@ Saturday ~2:00 AM IST ── Scraper starts (markets closed, data stable)
     │
 ~20:00-02:00 next day ── Scraper completes (~5,300 companies)
     ├── Run Layer 1: Quantitative scoring (<5 min)
-    ├── Run Layer 2: LLM analysis on top/bottom 200 (2-8 hours)
+    ├── Run Layer 2: LLM analysis (100 Tier 1 + 500 AG1 screen + 100 promoted = ~200 full AG4) (2-8 hours)
     ├── Generate ranked output + markdown reports
     │
 Sunday ── Dashboard updated with new data
@@ -401,9 +401,9 @@ The following quantitative models will be added to Layer 1, ordered by expected 
 - **Beneish M-Score**: Earnings manipulation detection — flags companies likely inflating earnings via accruals.
 - **ROIC** (Return on Invested Capital): More accurate than ROE for companies with significant debt. Key input for Magic Formula and Buffett evaluator.
 
-### 8.2 Layer 2: LLM Qualitative Analysis (~1-20 min depending on provider)
+### 8.2 Layer 2: LLM Qualitative Analysis — v2.2 Independent Scoring (~1-20 min depending on provider)
 
-Multi-agent architecture with tiered execution. Supports two LLM providers:
+Multi-agent architecture with tiered execution and independent scoring. As of v2.2, agents produce independent scores (0-100) rather than adjustments to the quant score. AG4 has full override authority for classification and conviction. Supports two LLM providers:
 - **Anthropic Claude** (`LLM_PROVIDER=anthropic`): Haiku for AG1-3, Sonnet for AG4. Prompt caching (5-min TTL).
 - **Local Qwen 3.5** (`LLM_PROVIDER=local`): Same model (qwen3.5-35b-a3b) for all 4 agents via SGLang/vLLM on `LOCAL_LLM_URL`. Thinking mode disabled via `chat_template_kwargs`.
 
@@ -411,10 +411,10 @@ Multi-agent architecture with tiered execution. Supports two LLM providers:
 
 | Agent | Role | Max Tokens | Key Features |
 |-------|------|-----------|--------------|
-| AG1 Fundamentals | Financial strength, trends, valuation | 4,096 | Structured CoT (5-step), peer comparison data when available |
+| AG1 Fundamentals | Financial strength, trends, valuation | 4,096 | Structured CoT (5-step), peer comparison data when available, produces independent `score` (0-100) |
 | AG2 Governance | Promoter behavior, institutional confidence | 4,096 | Structured CoT (4-step), shareholding trend analysis |
 | AG3 Risk | Downside scenarios, Pabrai risk hierarchy | 4,096 | Structured CoT (5-step), devil's advocate mandate (min 2 risks), risk parser pads to 2 if model under-delivers |
-| AG4 Synthesis | Combines AG1-3 into final thesis | 4,096 | Structured CoT (5-step), macro regime context, peer comparison, unambiguous conviction calibration (7 gates) |
+| AG4 Synthesis | Combines AG1-3 into final thesis | 4,096 | Structured CoT (5-step), macro regime context, peer comparison, unambiguous conviction calibration (7 gates), produces independent `score` (0-100) + `recommended_classification` + `classification_reasoning`, full override authority |
 
 AG1→AG2→AG3→AG4 run sequentially per company (AG4 depends on AG1-3 outputs). Different companies can run in parallel.
 
@@ -422,9 +422,10 @@ AG1→AG2→AG3→AG4 run sequentially per company (AG4 depends on AG1-3 outputs
 
 | Tier | Companies | Agents | Rationale |
 |------|-----------|--------|-----------|
-| Tier 1 | Top + bottom 100 by composite | All 4 (AG1→AG4) | Full analysis for actionable candidates |
-| Tier 2 | Top 500 (minus Tier 1) | AG1 only | Quick fundamentals check for watchlist |
-| Tier 3 | Remaining ~4,800 | None | Layer 1 score stands alone |
+| Tier 1 | Top 100 by quant rank | All 4 (AG1→AG4) | Direct full analysis for top candidates |
+| Tier 2 screening | Next 500 by quant rank | AG1 only | Fundamentals screen, AG1 produces independent score |
+| Tier 2 promoted | Top 100 from Tier 2 (by promotion score) | AG2→AG3→AG4 (AG1 cached) | Funnel: AG1 screens, best get full analysis |
+| Layer 1 only | Remaining ~4,700 | None | Quant score stands alone |
 
 **Prompt Caching (Anthropic only):** All agents use `cacheSystemPrompt: true` (ephemeral cache, 5-min TTL). System prompts cached after first company, reducing input costs ~90% within TTL.
 
@@ -447,10 +448,11 @@ After parsing each agent's output, cross-checks LLM claims against quantitative 
 |------|-------|----------|
 | "improving" trend but revenue declined 2+ of 3 years | AG1 | Override to "deteriorating" |
 | "high" earnings quality but OCF < 50% of net profit | AG1 | Override to "medium" |
-| Positive adjustment > 3 but company disqualified | AG1 | Cap at 0 |
+| Score > compositeScore+10 but disqualified | AG1 | Cap at compositeScore |
 | "high" conviction but company disqualified | AG4 | Override to "none" |
 | "high" conviction but signals "conflicting" | AG4 | Override to "medium" |
-| Adjustment > 10 but composite < 40 | AG4 | Cap at 5 |
+| AG4 classifies disqualified as strong_long/potential_long | AG4 | Override to strong_avoid |
+| Divergence: AG4 disagrees by 2+ levels or 25+ points | AG4 | Log to divergence watcher, email report |
 
 All overrides logged as warnings for transparency.
 
@@ -477,20 +479,33 @@ Three separate counters tracked: `completed` (successful parse), `failed` (excep
 
 | Tier | Companies | Cost/company | Subtotal |
 |------|-----------|-------------|----------|
-| Tier 1 (full 4-agent) | ~200 | ~$0.35 | ~$70 |
-| Tier 2 (AG1 only) | ~300 | ~$0.05 | ~$15 |
-| Tier 3 (no LLM) | ~4,800 | $0 | $0 |
+| Tier 1 (full 4-agent) | ~100 | ~$0.35 | ~$35 |
+| Tier 2 promoted (AG2-4, AG1 cached) | ~100 | ~$0.30 | ~$30 |
+| Tier 2 screen (AG1 only) | ~400 | ~$0.05 | ~$20 |
+| Layer 1 only | ~4,700 | $0 | $0 |
 | **Total** | **~5,300** | | **~$85/week** |
 
 With local Qwen: $0/week (self-hosted on homelab GPU).
 
 **Guardrails:**
-- Max adjustment: +/-10 (Tier 2), +/-15 (Tier 1 via AG4 synthesis)
+- AG1 and AG4 produce independent scores (0-100) -- quant score passed as reference signal
+- AG4 has full override authority for classification and conviction
+- Dual evaluation: quantClassification/quantConvictionLevel preserved for audit trail
+- Divergence watcher emails report to hello@dewanggogte.com when disagreements detected
 - Cannot override automatic disqualifiers
-- Low/none conviction -> adjustment halved
 - Post-validation cross-checks override contradictory LLM claims
 - LLM failure -> Layer 1 score stands alone
 - 3 retries per company, then skip
+
+**What's New in v2.2:**
+
+- **Independent LLM scoring**: Agents produce independent scores (0-100) instead of adjustments to the quant score. The quant composite is passed as a reference signal, not a base to modify.
+- **AG4 full override authority**: AG4 Synthesis can override both classification and conviction. It produces `recommended_classification` and `classification_reasoning` alongside its score.
+- **Funnel tiering model**: Tier 2 uses a two-stage funnel -- 500 companies screened by AG1, top 100 by promotion score get promoted to full AG2-AG3-AG4 analysis with AG1 results cached.
+- **Bottom companies removed**: Only top-ranked companies enter LLM evaluation. Bottom 100 no longer receive LLM analysis (quant disqualifiers are sufficient).
+- **Dual evaluation with attribution**: Both `quantClassification`/`quantConvictionLevel` and AG4's overrides are preserved. `classificationSource` field tracks whether the final classification came from quant or AG4.
+- **Divergence watcher**: When AG4 disagrees with quant by 2+ classification levels or 25+ points, the divergence is logged and an email report is sent to hello@dewanggogte.com.
+- **Dashboard attribution badges**: Company pages display QUANT or AG4 badges indicating the source of the final classification.
 
 #### 8.2.1 Planned LLM Pipeline Enhancements
 
@@ -987,6 +1002,6 @@ The codebase has **zero automated tests** (0% coverage across ~6,950 lines). Eve
 
 ---
 
-*Last updated: 2026-03-02*
-*Version: 2.3*
+*Last updated: 2026-03-11*
+*Version: 2.4*
 *Reference docs: docs/00-PROJECT-OVERVIEW.md, docs/01-TASK1-SCRAPER.md, docs/02-TASK2-PRINCIPLES.md, docs/03-TASK3-ANALYSIS.md*

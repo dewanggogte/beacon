@@ -26,6 +26,8 @@ interface CompanyRow {
   lynchCategoryScore?: string | null;
   lynchClassification?: string | null;
   convictionLevel?: string | null;
+  classificationSource?: string | null;
+  quantClassification?: string | null;
 }
 
 interface CompanyTableProps {
@@ -228,7 +230,20 @@ export function CompanyTable({ data, compact }: CompanyTableProps) {
                 {!compact && <td className="px-3 py-2 text-text-secondary">{row.sector ?? '-'}</td>}
                 <td className="px-3 py-2 font-bold">{Number(row.finalScore ?? 0).toFixed(0)}</td>
                 <td className={`px-3 py-2 text-xs font-medium ${classificationColor(row.classification)}`}>
-                  {classificationLabel(row.classification)}
+                  <span className="flex items-center gap-1">
+                    {classificationLabel(row.classification)}
+                    {row.classificationSource === 'ag4' && (
+                      <span
+                        className="inline-block w-4 h-4 rounded-full bg-accent-cyan/20 text-accent-cyan text-[9px] font-bold leading-4 text-center flex-shrink-0"
+                        title={row.quantClassification && row.quantClassification !== row.classification
+                          ? `AG4 override (Quant: ${classificationLabel(row.quantClassification)})`
+                          : 'AG4 confirmed'
+                        }
+                      >
+                        A
+                      </span>
+                    )}
+                  </span>
                 </td>
                 {hasFrameworks && !compact && (
                   <>

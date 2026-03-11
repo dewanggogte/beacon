@@ -34,7 +34,9 @@ SYNTHESIS RULES:
 4. CONVICTION requires: Strong fundamentals (AG1) + Clean governance (AG2)
    + Manageable risk (AG3) + Reasonable valuation. ALL FOUR must be present.
 5. DISQUALIFIED companies: Cannot receive positive conviction. Period.
-6. The adjustment range is WIDER here (-15 to +15) because you see the full picture.
+6. You have FULL AUTHORITY to override the quantitative classification.
+   The quant model's score and classification are provided as reference signals,
+   but you must form your own independent assessment based on all available data.
 
 CONVICTION CALIBRATION:
 
@@ -79,9 +81,32 @@ ANALYSIS CHAIN (follow this order in your reasoning field):
 2. RISK OVERRIDE: Does the risk analyst raise concerns that override positive fundamentals?
 3. CATEGORY FIT: How well does this stock fit its Lynch category expectations?
 4. CONVICTION TEST: Does it pass ALL four gates (fundamentals + governance + risk + valuation)?
-5. VERDICT: Investment thesis direction and magnitude.
+5. SCORE: Your independent score (0-100) — see scoring guide below.
+6. CLASSIFICATION: Your recommended classification — you may agree with or override the quant model.
+7. VERDICT: Investment thesis direction and magnitude.
 
-CRITICAL: Your final_adjustment range is -15 to +15. Use the full range when warranted.
+SCORING (0-100 scale):
+The quantitative model's composite score and classification are provided as reference signals.
+You must produce your OWN independent score based on the full picture (3 analyst reports +
+framework scores + macro context). You have full authority to diverge significantly from quant.
+
+Score guidelines:
+  80-100: Exceptional — strong on all four gates, clear investment case
+  65-79:  Good — solid company with minor concerns, still investable
+  40-64:  Mediocre — mixed signals, significant concerns
+  20-39:  Poor — multiple red flags, deteriorating fundamentals
+  0-19:   Avoid — broken thesis, severe issues
+
+CLASSIFICATION:
+You must provide a recommended_classification. Use these thresholds as guidance but your
+classification should reflect your holistic assessment, not just the score:
+  strong_long: Clear buy — exceptional quality, reasonable valuation, strong growth
+  potential_long: Interesting — good company but with caveats (valuation, timing, etc.)
+  neutral: Hold — no compelling reason to buy or sell
+  potential_short: Caution — deteriorating fundamentals or excessive valuation
+  strong_avoid: Sell/avoid — broken thesis, governance red flags, or severe risk
+
+If you DISAGREE with the quant classification, explain why in classification_reasoning.
 </instructions>
 
 <output_format>
@@ -90,7 +115,9 @@ Respond with ONLY valid JSON:
   "investment_thesis": "3-4 sentence thesis for or against this stock",
   "signal_alignment": "aligned" | "mixed" | "conflicting",
   "signal_alignment_detail": "how the 3 analysts' views relate to each other",
-  "final_adjustment": <number from -15 to +15>,
+  "score": <number from 0 to 100>,
+  "recommended_classification": "strong_long" | "potential_long" | "neutral" | "potential_short" | "strong_avoid",
+  "classification_reasoning": "why you agree/disagree with the quant classification",
   "conviction": "high" | "medium" | "low" | "none",
   "conviction_reasoning": "why this is/isn't a high-conviction bet",
   "time_horizon": "6m" | "1y" | "2y" | "5y",
@@ -107,11 +134,15 @@ export function parseSynthesisOutput(raw: string): SynthesisAgentOutput | null {
     if (!jsonMatch) return null;
     const data = JSON.parse(jsonMatch[0]);
 
+    const validClassifications = ['strong_long', 'potential_long', 'neutral', 'potential_short', 'strong_avoid'];
+
     return {
       investment_thesis: String(data.investment_thesis ?? ''),
       signal_alignment: ['aligned', 'mixed', 'conflicting'].includes(data.signal_alignment) ? data.signal_alignment : 'mixed',
       signal_alignment_detail: String(data.signal_alignment_detail ?? ''),
-      final_adjustment: Math.max(-15, Math.min(15, Number(data.final_adjustment ?? 0))),
+      score: Math.max(0, Math.min(100, Math.round(Number(data.score ?? 50)))),
+      recommended_classification: validClassifications.includes(data.recommended_classification) ? data.recommended_classification : 'neutral',
+      classification_reasoning: String(data.classification_reasoning ?? ''),
       conviction: ['high', 'medium', 'low', 'none'].includes(data.conviction) ? data.conviction : 'none',
       conviction_reasoning: String(data.conviction_reasoning ?? ''),
       time_horizon: ['6m', '1y', '2y', '5y'].includes(data.time_horizon) ? data.time_horizon : '2y',

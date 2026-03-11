@@ -12,7 +12,7 @@ export interface FundamentalsAgentOutput {
   category_assessment: string;
   red_flags: string[];
   positive_signals: string[];
-  adjustment: number;
+  score: number;
   confidence: 'high' | 'medium' | 'low';
   reasoning: string;
 }
@@ -53,7 +53,9 @@ export interface SynthesisAgentOutput {
   investment_thesis: string;
   signal_alignment: 'aligned' | 'mixed' | 'conflicting';
   signal_alignment_detail: string;
-  final_adjustment: number;
+  score: number;
+  recommended_classification: 'strong_long' | 'potential_long' | 'neutral' | 'potential_short' | 'strong_avoid';
+  classification_reasoning: string;
   conviction: 'high' | 'medium' | 'low' | 'none';
   conviction_reasoning: string;
   time_horizon: '6m' | '1y' | '2y' | '5y';

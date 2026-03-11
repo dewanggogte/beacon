@@ -48,4 +48,9 @@ export interface CompanyAnalysis {
   frameworkResults?: import('./frameworks.js').FrameworkResults;
   convictionLevel?: import('./frameworks.js').ConvictionLevel;
   convictionReasons?: string[];
+
+  // Dual evaluation: quant originals + attribution (v2.2)
+  quantClassification?: Classification;
+  quantConvictionLevel?: import('./frameworks.js').ConvictionLevel;
+  classificationSource?: 'quant' | 'ag4';
 }

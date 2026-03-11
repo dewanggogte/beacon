@@ -131,6 +131,11 @@ export const analysisResults = pgTable(
     convictionLevel: varchar('conviction_level', { length: 10 }),
     convictionReasons: jsonb('conviction_reasons'),
 
+    // Dual evaluation: quant originals + attribution (v2.2)
+    quantClassification: varchar('quant_classification', { length: 20 }),
+    quantConvictionLevel: varchar('quant_conviction_level', { length: 10 }),
+    classificationSource: varchar('classification_source', { length: 10 }),
+
     // Week-over-week
     scoreChange: numeric('score_change'),
     classificationChange: varchar('classification_change', { length: 50 }),

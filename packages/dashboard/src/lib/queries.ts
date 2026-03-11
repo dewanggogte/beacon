@@ -60,6 +60,8 @@ const companyColumns = {
   lynchCategoryScore: schema.analysisResults.lynchCategoryScore,
   lynchClassification: schema.analysisResults.lynchClassification,
   convictionLevel: schema.analysisResults.convictionLevel,
+  classificationSource: schema.analysisResults.classificationSource,
+  quantClassification: schema.analysisResults.quantClassification,
 };
 
 export async function getTopCompanies(

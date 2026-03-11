@@ -15,6 +15,13 @@
       "when": 1772128198509,
       "tag": "0001_eager_victor_mancha",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1773212563025,
+      "tag": "0002_new_jean_grey",
+      "breakpoints": true
     }
   ]
 }

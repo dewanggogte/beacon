@@ -48,7 +48,20 @@ ANALYSIS CHAIN (follow this order in your reasoning field):
 2. QUALITY: Does OCF confirm earnings? Owner earnings trend?
 3. VALUATION: Is current price justified by growth rate? PEG, P/E vs sector, Graham number.
 4. CATEGORY FIT: How well does this company perform AS its Lynch category?
-5. VERDICT: Net positive or negative? Magnitude of adjustment.
+5. VERDICT: Your independent overall score (0-100) for this company.
+
+SCORING (0-100 scale):
+You are provided the quantitative composite score as a reference signal, but you must form
+your OWN independent score. Your score should reflect YOUR assessment of the company's
+investment merit based on the data. The quant score is just one input — you may agree,
+diverge significantly, or anywhere in between.
+
+Score guidelines:
+  80-100: Exceptional — strong fundamentals, clean governance, reasonable valuation, growth runway
+  65-79:  Good — solid company with minor concerns, still investable
+  40-64:  Mediocre — mixed signals, significant concerns, hold at best
+  20-39:  Poor — multiple red flags, deteriorating fundamentals
+  0-19:   Avoid — broken thesis, severe issues
 
 CRITICAL RULES:
 - NEVER calculate ratios yourself. All numbers are pre-computed and correct.
@@ -69,9 +82,9 @@ Respond with ONLY valid JSON:
   "category_assessment": "how this company performs AS A {lynch_category}",
   "red_flags": ["flag with evidence"],
   "positive_signals": ["signal with evidence"],
-  "adjustment": <number from -5 to +5>,
+  "score": <number from 0 to 100>,
   "confidence": "high" | "medium" | "low",
-  "reasoning": "2-3 sentences justifying the adjustment, citing evidence"
+  "reasoning": "2-3 sentences justifying your score, citing evidence"
 }
 </output_format>`;
 
@@ -91,7 +104,7 @@ export function parseFundamentalsOutput(raw: string): FundamentalsAgentOutput | 
       category_assessment: String(data.category_assessment ?? ''),
       red_flags: Array.isArray(data.red_flags) ? data.red_flags.map(String) : [],
       positive_signals: Array.isArray(data.positive_signals) ? data.positive_signals.map(String) : [],
-      adjustment: Math.max(-5, Math.min(5, Number(data.adjustment ?? 0))),
+      score: Math.max(0, Math.min(100, Math.round(Number(data.score ?? 50)))),
       confidence: ['high', 'medium', 'low'].includes(data.confidence) ? data.confidence : 'low',
       reasoning: String(data.reasoning ?? ''),
     };

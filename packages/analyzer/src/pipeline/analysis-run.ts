@@ -3,6 +3,7 @@ import { desc } from 'drizzle-orm';
 import { loadRubric } from '../scoring/rubric-loader.js';
 import { scoreAllCompanies } from '../scoring/engine.js';
 import { runQualitativeAnalysis } from '../llm/qualitative-analyzer.js';
+import { runDivergenceWatcher } from '../llm/divergence-watcher.js';
 import { saveAnalysisResults } from '../storage/save-analysis.js';
 import { computeWeeklyChanges } from './weekly-comparison.js';
 import { generateWeeklyReport } from '../output/report-generator.js';
@@ -58,9 +59,25 @@ export async function runAnalysis(options: AnalysisOptions = {}): Promise<void> 
         model: options.llmModel,
       });
 
-      // Re-sort by final score after LLM adjustments
+      // Re-sort by final score after LLM scoring
       analyses.sort((a, b) => b.finalScore - a.finalScore);
       analyses.forEach((a, i) => { a.rank = i + 1; });
+
+      // Re-assign per-sector ranks after LLM scoring
+      const sectorGroups = new Map<string, typeof analyses>();
+      for (const a of analyses) {
+        const list = sectorGroups.get(a.sector) ?? [];
+        list.push(a);
+        sectorGroups.set(a.sector, list);
+      }
+      for (const [, group] of sectorGroups) {
+        group.sort((a, b) => b.finalScore - a.finalScore);
+        group.forEach((a, i) => { a.rankInSector = i + 1; });
+      }
+
+      // Run divergence watcher — analyzes quant-vs-AG4 disagreements and emails report
+      const ag4Count = analyses.filter((a) => a.classificationSource === 'ag4').length;
+      await runDivergenceWatcher(ag4Count);
     }
 
     // Save results to DB
