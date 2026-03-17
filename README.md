@@ -1,13 +1,13 @@
-# Screener Automation
+# Beacon
 
-**Indian Stock Market Screener and Analysis Pipeline** -- scrapes, scores, and ranks ~5,300 listed companies using value investing frameworks and multi-agent LLM analysis.
+**Autonomous Value Research** — scrapes, scores, and ranks ~5,300 listed Indian companies using value investing frameworks and multi-agent LLM analysis.
 
 ## What it does
 
 - **Scrapes** every listed Indian company from Screener.in (13 years of financials, ratios, shareholding, peer comparisons)
 - **Scores** each company across 5 dimensions using 21 quantitative metrics and 4 investing frameworks (Buffett, Graham, Lynch, Pabrai)
 - **Analyzes** top and bottom companies with a 4-agent LLM pipeline that produces independent qualitative scores, with post-validation to catch hallucinations
-- **Displays** results in a dark Bloomberg-terminal-style dashboard with conviction badges, framework breakdowns, agent analysis panels, and backtest results
+- **Displays** results in a warm, minimal dashboard with conviction badges, framework breakdowns, agent analysis panels, and backtest results
 
 ## Architecture overview
 
@@ -43,7 +43,7 @@
                           +--------v----------+
                           |    Dashboard      |
                           |  Next.js 15       |
-                          |  Bloomberg theme  |
+                          |  Beacon UI        |
                           +-------------------+
 ```
 
@@ -70,8 +70,8 @@
 ### Setup
 
 ```bash
-git clone git@github.com:dewanggogte/screener-automation.git
-cd screener-automation
+git clone git@github.com:dewanggogte/beacon.git
+cd beacon
 
 # Install dependencies
 npm install
@@ -103,15 +103,38 @@ npm run build
 | `npm run db:migrate` | Run Drizzle database migrations |
 | `npm run db:studio` | Open Drizzle Studio (DB browser) |
 
+### Targeted analysis
+
+Run the pipeline for specific companies, sectors, or with limits:
+
+```bash
+# Analyze specific companies (full LLM for all)
+npx tsx packages/analyzer/src/index.ts analyze --companies=RELIANCE,TCS,INFY
+
+# Analyze by sector (partial match)
+npx tsx packages/analyzer/src/index.ts analyze --sectors=IT,Banking
+
+# Limit to top N companies by quant rank
+npx tsx packages/analyzer/src/index.ts analyze --limit=50
+
+# Re-run LLM only on existing Layer 1 scores
+npx tsx packages/analyzer/src/index.ts analyze --llm-only --companies=RELIANCE,TCS
+
+# Combine filters
+npx tsx packages/analyzer/src/index.ts analyze --sectors=Pharma --limit=20
+```
+
+When `--companies` or `--sectors` is used, all matching companies get full AG1-AG4 evaluation regardless of rank (no tiering). The scrape step is automatically skipped.
+
 ## Monorepo structure
 
 ```
-screener-automation/
+beacon/
 |-- packages/
 |   |-- shared/          @screener/shared    DB schema, types, config, logger
 |   |-- scraper/         @screener/scraper   HTTP + Cheerio scraper for Screener.in
 |   |-- analyzer/        @screener/analyzer  Scoring, frameworks, LLM agents, backtest, macro
-|   |-- dashboard/       @screener/dashboard Next.js 15 web UI (Bloomberg theme)
+|   |-- dashboard/       @screener/dashboard Next.js 15 web UI (Beacon)
 |-- principles/          Scoring rubric + framework config files (JSON)
 |-- scripts/             Pipeline orchestration, test scripts, price fetcher
 |-- docs/                Architecture and operational documentation
@@ -159,7 +182,7 @@ Layer 2 applies qualitative analysis using 4 specialized agents with structured 
 
 ## Deployment
 
-Deployed to a K3s homelab cluster at `screener.nikamma.in` (internal network only).
+Deployed to a K3s homelab cluster at `beacon.nikamma.in` (internal network only).
 
 ```
 GitHub push --> GitHub Actions CI --> Docker build (amd64) --> GHCR
@@ -177,7 +200,7 @@ The Dockerfile uses a multi-stage build with 3 entrypoint modes:
 | `pipeline` | `node packages/analyzer/dist/index.js` | Runs the scrape + analyze pipeline |
 | `migrate` | `npx drizzle-kit migrate` | Applies database migrations |
 
-Container image: `ghcr.io/dewanggogte/screener-automation:latest`
+Container image: `ghcr.io/dewanggogte/beacon:latest`
 
 ## Environment variables
 
@@ -186,6 +209,7 @@ Container image: `ghcr.io/dewanggogte/screener-automation:latest`
 | `DATABASE_URL` | Yes | PostgreSQL connection string (e.g., `postgres://user:pass@host:5432/screener`) |
 | `ANTHROPIC_API_KEY` | If using Anthropic | API key for Claude Haiku/Sonnet |
 | `LLM_PROVIDER` | No | `anthropic` (default) or `local` |
+| `LOCAL_LLM_TEMPERATURE` | No | Temperature for local model (default: 0.7) |
 | `LOCAL_LLM_URL` | If using local LLM | SGLang/vLLM endpoint (e.g., `http://192.168.0.42:8000`) |
 | `LOCAL_LLM_MODEL` | If using local LLM | Model name (e.g., `qwen3.5-35b-a3b`) |
 | `SMTP_HOST` | No | SMTP server for divergence watcher email reports |
@@ -195,15 +219,16 @@ Container image: `ghcr.io/dewanggogte/screener-automation:latest`
 
 ## Dashboard pages
 
-The dashboard uses a dark Bloomberg-terminal aesthetic with 7 pages:
+The Beacon dashboard has a warm, minimal light theme with 8 pages:
 
 | Page | Description |
 |------|-------------|
-| **Home** | Pipeline overview, latest run stats, top/bottom movers |
+| **Home** | High conviction picks, tabbed classification view, market snapshot |
+| **Overview** | Visual pipeline explainer — four stages, scoring dimensions, agent descriptions, analysis funnel |
+| **Rankings** | Full sortable ranking table across all scored companies |
 | **Conviction** | Companies filtered by conviction level (high/medium/low), with Lynch category badges |
 | **Frameworks** | Side-by-side Buffett, Graham, Lynch, and Pabrai scores for each company |
-| **Rankings** | Full sortable ranking table across all scored companies |
-| **Backtest** | Historical backtest results with walk-forward analysis |
+| **Backtest** | Historical backtest results, walk-forward analysis, setup instructions |
 | **Company detail** | Deep dive into a single company: all metrics, framework scores, agent analysis panels |
 | **Pipeline status** | Current and historical pipeline run progress and timing |
 

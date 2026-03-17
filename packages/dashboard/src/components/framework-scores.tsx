@@ -7,11 +7,11 @@ function scoreColor(score: number): string {
 }
 
 function barColor(score: number): string {
-  if (score >= 75) return '#00e676';
-  if (score >= 55) return '#00e5ff';
-  if (score >= 35) return '#8888a0';
-  if (score >= 20) return '#ffab00';
-  return '#ff1744';
+  if (score >= 75) return '#2d7a4f';
+  if (score >= 55) return '#b85a3b';
+  if (score >= 35) return '#666666';
+  if (score >= 20) return '#b8860b';
+  return '#c0392b';
 }
 
 interface FrameworkScoresProps {

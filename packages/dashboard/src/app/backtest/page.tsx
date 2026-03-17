@@ -21,6 +21,38 @@ interface BacktestPick {
   exitPrice: number;
 }
 
+function SetupSection() {
+  return (
+    <div className="bg-bg-card border border-border rounded-lg p-6">
+      <h2 className="text-sm font-medium mb-3">Setup</h2>
+      <div className="text-text-secondary text-sm space-y-2">
+        <p>1. Fetch historical prices:</p>
+        <code className="block bg-bg-secondary px-3 py-1 rounded text-xs">
+          python scripts/fetch-prices.py --period 10y
+        </code>
+        <p>2. Run a backtest on a past analysis:</p>
+        <code className="block bg-bg-secondary px-3 py-1 rounded text-xs">
+          npx tsx packages/analyzer/src/index.ts backtest --run=3 --eval-date=2025-06-01
+        </code>
+        <p>3. Or run walk-forward across multiple periods:</p>
+        <code className="block bg-bg-secondary px-3 py-1 rounded text-xs">
+          npx tsx packages/analyzer/src/index.ts walk-forward --from=2024-01 --to=2025-12
+        </code>
+      </div>
+      <div className="mt-4 pt-3 border-t border-border">
+        <a
+          href="https://github.com/dewanggogte/beacon"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-accent-cyan text-sm hover:underline"
+        >
+          View on GitHub &rarr;
+        </a>
+      </div>
+    </div>
+  );
+}
+
 export default async function BacktestPage() {
   const runs = await getBacktestRuns();
 
@@ -31,23 +63,7 @@ export default async function BacktestPage() {
           <h1 className="text-xl font-bold mb-1">Backtesting</h1>
           <p className="text-text-muted text-sm">No backtest runs yet.</p>
         </div>
-        <div className="bg-bg-card border border-border rounded-lg p-6">
-          <h2 className="text-sm font-medium mb-3">How to run a backtest</h2>
-          <div className="text-text-secondary text-sm space-y-2">
-            <p>1. Fetch historical prices:</p>
-            <code className="block bg-bg-secondary px-3 py-1 rounded text-xs">
-              python scripts/fetch-prices.py --period 10y
-            </code>
-            <p>2. Run a backtest on a past analysis:</p>
-            <code className="block bg-bg-secondary px-3 py-1 rounded text-xs">
-              npx tsx packages/analyzer/src/index.ts backtest --run=3 --eval-date=2025-06-01
-            </code>
-            <p>3. Run walk-forward analysis:</p>
-            <code className="block bg-bg-secondary px-3 py-1 rounded text-xs">
-              npx tsx packages/analyzer/src/index.ts walk-forward --from=2024-01-01 --to=2025-12-01
-            </code>
-          </div>
-        </div>
+        <SetupSection />
       </div>
     );
   }
@@ -147,6 +163,8 @@ export default async function BacktestPage() {
           </table>
         </div>
       </div>
+
+      <SetupSection />
 
       {/* Latest Run Detail */}
       {runs[0] && (runs[0].picks as BacktestPick[] | null) && (

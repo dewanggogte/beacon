@@ -267,7 +267,7 @@ Tier assignment by rank: Tier 1 = top 100 + bottom 50. Tier 2 = top 500 + bottom
 
 ## Package: @screener/dashboard
 
-Next.js 15 with App Router. All pages use `force-dynamic` for server-side data fetching. Dark Bloomberg-terminal theme with monospace fonts.
+Next.js 15 with App Router. All pages use `force-dynamic` for server-side data fetching. Warm, minimal light theme (Beacon) with serif typography.
 
 ```
 dashboard/src/
@@ -319,7 +319,7 @@ principles/
 | PostgreSQL + Drizzle | JSONB for 13yr financial data, typed queries, studio UI |
 | Anthropic Claude or Qwen 3.5 | Dual-provider LLM. Prompt caching (Anthropic), $0 cost (local) |
 | Next.js 15 | Server Components for DB queries, App Router, force-dynamic |
-| Tailwind CSS 4 | Custom Bloomberg theme via CSS variables, minimal bundle |
+| Tailwind CSS 4 | Beacon theme via CSS variables, minimal bundle |
 | yfinance (Python) | Free historical prices, NSE/BSE support, no API key |
 
 ## Planned: Scoring Model Upgrades (M10)

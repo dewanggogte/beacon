@@ -22,6 +22,8 @@ export interface QualitativeOptions {
   tier2PromoteCount?: number;
   model?: string;
   synthModel?: string;
+  /** When true, all companies get full AG1-AG4 (no tiering). Used for targeted analysis. */
+  forceAll?: boolean;
 }
 
 /**
@@ -49,6 +51,7 @@ export async function runQualitativeAnalysis(
     tier2PromoteCount = 100,
     model,
     synthModel,
+    forceAll = false,
   } = options;
   const client = createLlmClient();
 
@@ -64,23 +67,32 @@ export async function runQualitativeAnalysis(
   // Reset divergence log for this pipeline run
   resetDivergenceLog();
 
-  // Assign tiers — top N only, no bottom companies
-  const tier1: CompanyAnalysis[] = [];
-  const tier2: CompanyAnalysis[] = [];
-
+  // All companies get quant originals preserved
   for (const a of analyses) {
-    if (a.rank <= tier1Count) {
-      tier1.push(a);
-    } else if (a.rank <= tier1Count + tier2Count) {
-      tier2.push(a);
-    }
-    // All companies get quant originals preserved
     a.quantClassification = a.classification;
     a.quantConvictionLevel = a.convictionLevel;
     a.classificationSource = 'quant';
   }
 
-  logger.info(`Multi-agent LLM v2.2: ${tier1.length} Tier 1 (direct AG1-4), ${tier2.length} Tier 2 (AG1 funnel → promote top ${tier2PromoteCount}), ${total - tier1.length - tier2.length} Layer 1 only`);
+  // Assign tiers
+  const tier1: CompanyAnalysis[] = [];
+  const tier2: CompanyAnalysis[] = [];
+
+  if (forceAll) {
+    // Targeted mode: all companies go straight to Tier 1 (full AG1-AG4)
+    tier1.push(...analyses);
+    logger.info(`Multi-agent LLM (targeted): ${tier1.length} companies → full AG1-AG4`);
+  } else {
+    // Normal funnel tiering
+    for (const a of analyses) {
+      if (a.rank <= tier1Count) {
+        tier1.push(a);
+      } else if (a.rank <= tier1Count + tier2Count) {
+        tier2.push(a);
+      }
+    }
+    logger.info(`Multi-agent LLM v2.2: ${tier1.length} Tier 1 (direct AG1-4), ${tier2.length} Tier 2 (AG1 funnel → promote top ${tier2PromoteCount}), ${total - tier1.length - tier2.length} Layer 1 only`);
+  }
 
   // Load macro regime once for all companies
   let regimeResult: { regime: string; confidence: string; signals: string[] } | null = null;

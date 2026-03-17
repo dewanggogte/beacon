@@ -8,7 +8,7 @@ This project builds an automated pipeline that:
 1. Scrapes comprehensive financial data for all listed Indian companies from Screener.in
 2. Applies a rigorous, documented scoring framework based on world-class investor methodologies
 3. Produces ranked long/short candidate lists optimized for **risk-adjusted returns** (Sharpe ratio)
-4. Displays results in a Bloomberg-terminal-style web dashboard
+4. Displays results in a warm, minimal web dashboard (Beacon)
 
 **This is a personal research and analysis tool. It is NOT financial advice.**
 
@@ -170,7 +170,7 @@ Scoring output per company per run.
 ## 6. Package Structure
 
 ```
-screener-automation/
+beacon/
 ├── PRD.md                              # This document
 ├── package.json                        # Root: npm workspaces config
 ├── tsconfig.base.json                  # Shared TypeScript options
@@ -426,6 +426,7 @@ AG1→AG2→AG3→AG4 run sequentially per company (AG4 depends on AG1-3 outputs
 | Tier 2 screening | Next 500 by quant rank | AG1 only | Fundamentals screen, AG1 produces independent score |
 | Tier 2 promoted | Top 100 from Tier 2 (by promotion score) | AG2→AG3→AG4 (AG1 cached) | Funnel: AG1 screens, best get full analysis |
 | Layer 1 only | Remaining ~4,700 | None | Quant score stands alone |
+| Targeted (`--companies`/`--sectors`) | User-specified | All 4 (AG1→AG4) | Bypasses tiering, all get full evaluation |
 
 **Prompt Caching (Anthropic only):** All agents use `cacheSystemPrompt: true` (ephemeral cache, 5-min TTL). System prompts cached after first company, reducing input costs ~90% within TTL.
 
@@ -506,6 +507,8 @@ With local Qwen: $0/week (self-hosted on homelab GPU).
 - **Dual evaluation with attribution**: Both `quantClassification`/`quantConvictionLevel` and AG4's overrides are preserved. `classificationSource` field tracks whether the final classification came from quant or AG4.
 - **Divergence watcher**: When AG4 disagrees with quant by 2+ classification levels or 25+ points, the divergence is logged and an email report is sent to hello@dewanggogte.com.
 - **Dashboard attribution badges**: Company pages display QUANT or AG4 badges indicating the source of the final classification.
+- **Targeted analysis CLI**: `--companies=A,B,C` and `--sectors=IT,Banking` flags allow running analysis for specific companies or sectors. All targeted companies bypass tiering and get full AG1-AG4 evaluation. `--limit=N` caps analysis to top N by quant rank.
+- **LLM-only mode**: `--llm-only` flag re-runs the LLM layer on existing Layer 1 results without re-scoring quant metrics. Combines with `--companies`/`--sectors`/`--limit` for targeted LLM re-evaluation.
 
 #### 8.2.1 Planned LLM Pipeline Enhancements
 
@@ -628,9 +631,8 @@ PipelineError (base)
 ## 9. Dashboard Requirements
 
 ### 9.1 Design Language
-- Bloomberg-terminal aesthetic: dark background (#0a0a0f), data-dense
-- Color coding: green (#00ff88) for longs, red (#ff4444) for shorts, blue (#4488ff) for neutral
-- Monospace numbers for financial data
+- Warm, minimal light theme (Beacon) — off-white background, serif typography, terracotta accent
+- Color coding: green (#2d7a4f) for longs, red (#c0392b) for avoids, terracotta (#b85a3b) as primary accent
 - Responsive (works on mobile for quick checks)
 
 ### 9.2 Pages
@@ -702,11 +704,11 @@ PipelineError (base)
 - [x] Markdown reports generated
 
 ### M5: Dashboard Live ✓
-- [x] Runs at localhost:3000 and screener.nikamma.in
+- [x] Runs at localhost:3000 and beacon.nikamma.in
 - [x] 6 pages functional: home, conviction, frameworks, rankings, backtest, company detail
 - [x] Rankings table sorts/filters/exports
 - [x] Lynch category badges, conviction indicators, framework score panels
-- [x] Dark mode Bloomberg aesthetic
+- [x] Warm minimal light theme (Beacon)
 
 ### M6: Full Pipeline ✓
 - [x] `scripts/run-pipeline.ts` runs end-to-end unattended
@@ -716,7 +718,7 @@ PipelineError (base)
 ### M7: Homelab Deployment ✓
 - [x] Dockerized with multi-stage build (3 entrypoint modes: dashboard, pipeline, migrate)
 - [x] GitHub Actions CI/CD → GHCR container image → ArgoCD rollout
-- [x] K3s cluster deployment at `screener.nikamma.in` (internal only)
+- [x] K3s cluster deployment at `beacon.nikamma.in` (internal only)
 - [x] CNPG-managed PostgreSQL database
 - [x] SealedSecrets for DATABASE_URL + ANTHROPIC_API_KEY
 - [x] Weekly CronJob for pipeline execution
@@ -839,19 +841,19 @@ LOCAL_LLM_TEMPERATURE=0.7              # Temperature for local model
 ### Docker Build (for homelab deployment)
 ```bash
 # Build the container image
-docker build -t screener-automation .
+docker build -t beacon .
 
 # Run modes (set via CMD or entrypoint argument):
-docker run screener-automation dashboard   # Next.js server on :3000
-docker run screener-automation pipeline    # Scraper + analyzer
-docker run screener-automation migrate     # Run drizzle-kit migrations
+docker run beacon dashboard   # Next.js server on :3000
+docker run beacon pipeline    # Scraper + analyzer
+docker run beacon migrate     # Run drizzle-kit migrations
 ```
 
 ---
 
 ## 13. Homelab Deployment
 
-The application is deployed to a K3s cluster and accessible at `screener.nikamma.in` (internal network only).
+The application is deployed to a K3s cluster and accessible at `beacon.nikamma.in` (internal network only).
 
 ### Architecture
 ```
@@ -865,17 +867,17 @@ GitHub push → GitHub Actions CI → Docker build (amd64) → Push to GHCR
 ### Components
 | Component | Detail |
 |-----------|--------|
-| **Container registry** | `ghcr.io/dewanggogte/screener-automation:latest` (public) |
-| **K8s namespace** | `screener-automation` (ArgoCD auto-creates) |
+| **Container registry** | `ghcr.io/dewanggogte/beacon:latest` (public) |
+| **K8s namespace** | `beacon` (ArgoCD auto-creates) |
 | **Database** | CNPG-managed PostgreSQL, `screener` DB on `postgres-rw.postgres.svc.cluster.local:5432` |
 | **Secrets** | `screener-secrets` SealedSecret (DATABASE_URL + ANTHROPIC_API_KEY) |
-| **Ingress** | Internal-only at `screener.nikamma.in` |
+| **Ingress** | Internal-only at `beacon.nikamma.in` |
 | **Pipeline schedule** | Weekly CronJob |
 | **Health probe** | `/api/healthz` (readiness + liveness) |
 
 ### Manifest locations
-- **K8s manifests**: `/Users/dg/Documents/lab/nikamma/apps/screener-automation/`
-- **ArgoCD app**: `/Users/dg/Documents/lab/nikamma/argocd/apps/screener-automation.yaml`
+- **K8s manifests**: `/Users/dg/Documents/lab/nikamma/apps/beacon/`
+- **ArgoCD app**: `/Users/dg/Documents/lab/nikamma/argocd/apps/beacon.yaml`
 
 ### First-run note
 The pipeline requires companies in the DB to scrape. On a fresh deploy, the `list` command must run first to seed the companies table (~5 min via search API). See M8 for auto-seed improvement.

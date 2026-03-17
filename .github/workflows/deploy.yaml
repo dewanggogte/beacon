@@ -26,7 +26,7 @@ jobs:
         with:
           push: true
           platforms: linux/amd64
-          tags: ghcr.io/dewanggogte/screener-automation:latest
+          tags: ghcr.io/dewanggogte/beacon:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
 

@@ -19,6 +19,9 @@ switch (command) {
   case 'analyze': {
     const scrapeRunId = getFlagValue('run') ? Number(getFlagValue('run')) : undefined;
     const llmModel = getFlagValue('model');
+    const companiesRaw = getFlagValue('companies');
+    const sectorsRaw = getFlagValue('sectors');
+    const limitRaw = getFlagValue('limit');
 
     runAnalysis({
       scrapeRunId,
@@ -26,6 +29,9 @@ switch (command) {
       llmOnly: getFlag('llm-only'),
       skipReport: getFlag('skip-report'),
       llmModel,
+      companies: companiesRaw ? companiesRaw.split(',').map((c) => c.trim()) : undefined,
+      sectors: sectorsRaw ? sectorsRaw.split(',').map((s) => s.trim()) : undefined,
+      limit: limitRaw ? Number(limitRaw) : undefined,
     })
       .then(() => process.exit(0))
       .catch((err) => {
@@ -230,10 +236,13 @@ switch (command) {
     console.log('');
     console.log('Options (analyze):');
     console.log('  --skip-llm           Skip LLM qualitative analysis (Layer 1 only)');
-    console.log('  --llm-only           Only run LLM on existing Layer 1 results');
+    console.log('  --llm-only           Re-run LLM on existing Layer 1 results (no re-scoring)');
     console.log('  --skip-report        Skip report generation');
     console.log('  --run=<id>           Analyze a specific scrape run');
     console.log('  --model=<name>       LLM model name');
+    console.log('  --companies=A,B,C    Analyze specific companies (comma-separated codes)');
+    console.log('  --sectors=IT,Banking  Filter by sector (comma-separated, partial match)');
+    console.log('  --limit=N            Limit to top N companies by quant rank');
     console.log('');
     console.log('Options (backtest):');
     console.log('  --run=<id>           Scrape run to backtest');

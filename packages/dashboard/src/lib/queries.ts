@@ -2,12 +2,14 @@ import { db, schema } from '@screener/shared';
 import { desc, eq, sql, and, isNull, or } from 'drizzle-orm';
 
 export async function getLatestRunId(): Promise<number | null> {
+  // Find the latest scrape run that has analysis results
   const runs = await db
-    .select({ id: schema.scrapeRuns.id })
-    .from(schema.scrapeRuns)
-    .orderBy(desc(schema.scrapeRuns.startedAt))
+    .select({ scrapeRunId: schema.analysisResults.scrapeRunId })
+    .from(schema.analysisResults)
+    .groupBy(schema.analysisResults.scrapeRunId)
+    .orderBy(desc(schema.analysisResults.scrapeRunId))
     .limit(1);
-  return runs[0]?.id ?? null;
+  return runs[0]?.scrapeRunId ?? null;
 }
 
 export async function getSummaryStats(runId: number) {

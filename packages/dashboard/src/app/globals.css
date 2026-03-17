@@ -1,34 +1,41 @@
 @import "tailwindcss";
 
 @theme {
-  --color-bg-primary: #0a0a0f;
-  --color-bg-secondary: #12121a;
-  --color-bg-card: #1a1a2e;
-  --color-bg-hover: #252540;
-  --color-border: #2a2a40;
-  --color-text-primary: #e0e0e8;
-  --color-text-secondary: #8888a0;
-  --color-text-muted: #555570;
-  --color-accent-green: #00e676;
-  --color-accent-red: #ff1744;
-  --color-accent-amber: #ffab00;
-  --color-accent-blue: #2979ff;
-  --color-accent-cyan: #00e5ff;
+  /* Warm, minimal palette inspired by dewanggogte.com */
+  --color-bg-primary: #fdfcfb;
+  --color-bg-secondary: #f3f1ee;
+  --color-bg-card: #ffffff;
+  --color-bg-hover: #f0eee9;
+  --color-border: #e8e6e3;
+  --color-text-primary: #2c2c2c;
+  --color-text-secondary: #666666;
+  --color-text-muted: #999999;
+
+  /* Financial signal colors — toned down for light background */
+  --color-accent-green: #2d7a4f;
+  --color-accent-red: #c0392b;
+  --color-accent-amber: #b8860b;
+  --color-accent-blue: #2563eb;
+  --color-accent-cyan: #b85a3b;    /* Terracotta — primary accent, replaces cyan */
+
+  --font-serif: 'Source Serif 4', Georgia, serif;
 }
 
 body {
   background: var(--color-bg-primary);
   color: var(--color-text-primary);
-  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  font-family: var(--font-serif);
+  font-size: 15px;
+  line-height: 1.6;
 }
 
-/* Custom scrollbar */
+/* Scrollbar — subtle for light theme */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: var(--color-bg-primary);
+  background: var(--color-bg-secondary);
 }
 ::-webkit-scrollbar-thumb {
   background: var(--color-border);

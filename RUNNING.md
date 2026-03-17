@@ -679,7 +679,7 @@ psql -h localhost -p 5433 -U screener -d screener \
 The password is in the SealedSecret. Extract it:
 
 ```bash
-kubectl get secret -n screener-automation screener-secrets \
+kubectl get secret -n beacon screener-secrets \
   -o jsonpath='{.data.DATABASE_URL}' | base64 -d
 # Password is between : and @ in the URL
 ```
@@ -691,14 +691,14 @@ Create a one-off job using the analysis-only pipeline mode:
 ```bash
 kubectl create job screener-analyze-manual \
   --from=cronjob/screener-pipeline \
-  -n screener-automation \
+  -n beacon \
   -- pipeline:analyze
 
 # Watch progress
-kubectl logs -f job/screener-analyze-manual -n screener-automation
+kubectl logs -f job/screener-analyze-manual -n beacon
 
 # Clean up
-kubectl delete job screener-analyze-manual -n screener-automation
+kubectl delete job screener-analyze-manual -n beacon
 ```
 
 Or for Layer 1 only (no LLM, fastest):
@@ -706,7 +706,7 @@ Or for Layer 1 only (no LLM, fastest):
 ```bash
 kubectl create job screener-quick-manual \
   --from=cronjob/screener-pipeline \
-  -n screener-automation \
+  -n beacon \
   -- pipeline:quick
 ```
 
@@ -738,5 +738,5 @@ kubectl create job screener-quick-manual \
 | Test single company E2E | `npx tsx scripts/test-adani-power.ts` |
 | Diagnose LLM | `npx tsx scripts/diagnose-llm.ts` |
 | Fetch historical prices | `python scripts/fetch-prices.py` |
-| Re-run analysis (homelab) | `kubectl create job screener-analyze-manual --from=cronjob/screener-pipeline -n screener-automation -- pipeline:analyze` |
+| Re-run analysis (homelab) | `kubectl create job screener-analyze-manual --from=cronjob/screener-pipeline -n beacon -- pipeline:analyze` |
 | Check scrape data (homelab) | `kubectl port-forward -n postgres svc/postgres-rw 5433:5432` then `psql -h localhost -p 5433 -U screener -d screener` |

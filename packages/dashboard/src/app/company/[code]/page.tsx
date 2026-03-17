@@ -157,7 +157,7 @@ export default async function CompanyDetailPage({
                       className="h-full rounded-full transition-all"
                       style={{
                         width: `${score}%`,
-                        backgroundColor: score >= 80 ? '#00e676' : score >= 65 ? '#00e5ff' : score >= 40 ? '#8888a0' : score >= 20 ? '#ffab00' : '#ff1744',
+                        backgroundColor: score >= 80 ? '#2d7a4f' : score >= 65 ? '#b85a3b' : score >= 40 ? '#666666' : score >= 20 ? '#b8860b' : '#c0392b',
                       }}
                     />
                   </div>

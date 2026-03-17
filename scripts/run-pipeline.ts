@@ -6,11 +6,14 @@
  *   npx tsx scripts/run-pipeline.ts [options]
  *
  * Options:
- *   --scrape-only      Only run the scraper
- *   --analyze-only     Only run the analyzer (on latest scrape run)
- *   --skip-llm         Skip LLM qualitative analysis
- *   --limit=N          Limit scraper to N companies
- *   --resume           Resume a previous incomplete scrape run
+ *   --scrape-only          Only run the scraper
+ *   --analyze-only         Only run the analyzer (on latest scrape run)
+ *   --skip-llm             Skip LLM qualitative analysis
+ *   --llm-only             Re-run LLM on existing Layer 1 results
+ *   --limit=N              Limit scraper to N companies (scrape) or top N (analyze)
+ *   --resume               Resume a previous incomplete scrape run
+ *   --companies=A,B,C      Analyze specific companies (comma-separated codes)
+ *   --sectors=IT,Banking    Filter by sector (comma-separated, partial match)
  */
 import { logger } from '@screener/shared';
 
@@ -31,12 +34,15 @@ async function main() {
   const scrapeOnly = getArg('scrape-only');
   const analyzeOnly = getArg('analyze-only');
   const skipLlm = getArg('skip-llm');
+  const llmOnly = getArg('llm-only');
   const resume = getArg('resume');
   const limit = getArgValue('limit') ? Number(getArgValue('limit')) : undefined;
   const runId = getArgValue('run') ? Number(getArgValue('run')) : undefined;
+  const companiesRaw = getArgValue('companies');
+  const sectorsRaw = getArgValue('sectors');
 
-  // Step 1: Scrape
-  if (!analyzeOnly) {
+  // Step 1: Scrape (skip if analyze-only, llm-only, or targeting specific companies)
+  if (!analyzeOnly && !llmOnly && !companiesRaw && !sectorsRaw) {
     logger.info('\n=== Step 1: Scraping ===');
     const { runScrape } = await import('../packages/scraper/src/pipeline/scrape-run.js');
     await runScrape({ limit, resume });
@@ -46,7 +52,14 @@ async function main() {
   if (!scrapeOnly) {
     logger.info('\n=== Step 2: Analysis ===');
     const { runAnalysis } = await import('../packages/analyzer/src/pipeline/analysis-run.js');
-    await runAnalysis({ skipLlm, scrapeRunId: runId });
+    await runAnalysis({
+      skipLlm,
+      llmOnly,
+      scrapeRunId: runId,
+      companies: companiesRaw ? companiesRaw.split(',').map((c) => c.trim()) : undefined,
+      sectors: sectorsRaw ? sectorsRaw.split(',').map((s) => s.trim()) : undefined,
+      limit,
+    });
   }
 
   const elapsed = ((Date.now() - startTime) / 1000).toFixed(0);
