@@ -1,14 +1,42 @@
+# Dependencies
 node_modules/
+
+# Build output
 dist/
 .next/
 *.tsbuildinfo
+
+# Environment
 .env
 .env.local
-chrome-profile/
-logs/
-reports/*.md
-!reports/.gitkeep
+.env.production
+
+# Secrets
 secrets/
-OPS.md
-docs/
+
+# Generated reports (keep the directory)
+reports/*.md
+reports/*.html
+reports/*.json
+!reports/.gitkeep
+
+# Logs
+logs/
+*.log
+
+# OS files
 .DS_Store
+Thumbs.db
+
+# Editor files
+*.swp
+*.swo
+*~
+.idea/
+.vscode/
+
+# Browser profile (scraper testing)
+chrome-profile/
+
+# Ops notes (private)
+OPS.md
