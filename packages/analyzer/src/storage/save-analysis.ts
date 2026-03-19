@@ -48,6 +48,11 @@ export async function saveAnalysisResults(
       quantClassification: analysis.quantClassification ?? analysis.classification,
       quantConvictionLevel: analysis.quantConvictionLevel ?? analysis.convictionLevel ?? null,
       classificationSource: analysis.classificationSource ?? 'quant',
+      // v3 financial health scores
+      piotroskiFScore: analysis.piotroskiFScore ?? null,
+      altmanZScore: analysis.altmanZScore != null ? String(analysis.altmanZScore) : null,
+      beneishMScore: analysis.beneishMScore != null ? String(analysis.beneishMScore) : null,
+      gateResults: analysis.gateResults ?? null,
     };
 
     await db

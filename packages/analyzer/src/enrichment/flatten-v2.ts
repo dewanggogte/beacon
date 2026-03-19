@@ -12,6 +12,7 @@ import {
   coefficientOfVariation,
   absoluteChange,
 } from './trend-analyzer.js';
+import { computePiotroskiFScore, computeAltmanZScore, computeBeneishMScore } from './financial-scores.js';
 
 type Snapshot = typeof schema.companySnapshots.$inferSelect;
 
@@ -153,6 +154,13 @@ export interface EnrichedSnapshot {
   balanceSheet: Record<string, unknown>[] | null;
   annualPl: Record<string, unknown>[] | null;
   sector: string;
+
+  // --- v3 financial health scores ---
+  piotroskiFScore: number;
+  altmanZScore: number | null;
+  beneishMScore: number | null;
+  roceTrailing3Y: number | null;
+  revenueDeclineYears: number;
 }
 
 /**
@@ -252,6 +260,11 @@ export function flattenV2(
     balanceSheet: null,
     annualPl: null,
     sector,
+    piotroskiFScore: 0,
+    altmanZScore: null,
+    beneishMScore: null,
+    roceTrailing3Y: null,
+    revenueDeclineYears: 0,
   };
 
   // --- Annual P&L ---
@@ -585,6 +598,22 @@ export function flattenV2(
   enriched.peerComparison = Array.isArray(snapshot.peerComparison)
     ? (snapshot.peerComparison as Record<string, unknown>[])
     : null;
+
+  // v3 financial health scores
+  enriched.piotroskiFScore = computePiotroskiFScore(enriched);
+  enriched.altmanZScore = computeAltmanZScore(enriched);
+  enriched.beneishMScore = computeBeneishMScore(enriched);
+  enriched.roceTrailing3Y = seriesAverageN(enriched.roceHistory, 3);
+
+  // Count revenue decline years in last 5
+  const rev5 = enriched.revenueHistory.slice(0, 5);
+  let declineCount = 0;
+  for (let i = 0; i < rev5.length - 1; i++) {
+    const curr = rev5[i];
+    const prev = rev5[i + 1];
+    if (curr != null && prev != null && prev > 0 && curr < prev) declineCount++;
+  }
+  enriched.revenueDeclineYears = declineCount;
 
   return enriched;
 }

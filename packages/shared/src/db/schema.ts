@@ -136,6 +136,12 @@ export const analysisResults = pgTable(
     quantConvictionLevel: varchar('quant_conviction_level', { length: 10 }),
     classificationSource: varchar('classification_source', { length: 10 }),
 
+    // v3 financial health scores
+    piotroskiFScore: integer('piotroski_f_score'),
+    altmanZScore: numeric('altman_z_score'),
+    beneishMScore: numeric('beneish_m_score'),
+    gateResults: jsonb('gate_results'),
+
     // Week-over-week
     scoreChange: numeric('score_change'),
     classificationChange: varchar('classification_change', { length: 50 }),

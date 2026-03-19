@@ -2,7 +2,7 @@ import { db, schema, logger } from '@screener/shared';
 import type { ScoringRubric, CompanyAnalysis, DimensionScore } from '@screener/shared';
 import { eq } from 'drizzle-orm';
 import { scoreDimension } from './dimension-scorer.js';
-import { computeComposite, computeCompositeV2, classify, computeConviction } from './composite-scorer.js';
+import { computeComposite, computeGeometricMean, classify, computeConviction } from './composite-scorer.js';
 import { checkDisqualifiers } from './disqualifier.js';
 import { flattenV2, enrichedToFlat, type EnrichedSnapshot } from '../enrichment/flatten-v2.js';
 import { evaluateAllFrameworks } from '../frameworks/index.js';
@@ -47,8 +47,8 @@ export async function scoreAllCompanies(
     enrichedMap.set(company.id, enriched);
     const flat = enrichedToFlat(enriched);
 
-    // Check disqualifiers (including 2 new rules)
-    const disqualificationReasons = checkDisqualifiers(flat, rubric.automaticDisqualifiers, enriched);
+    // Check disqualifiers (including v3 hard gates)
+    const { reasons: disqualificationReasons, gateResults } = checkDisqualifiers(flat, rubric.automaticDisqualifiers, enriched);
     const disqualified = disqualificationReasons.length > 0;
 
     // Score each dimension (v1 — preserved for backwards compatibility)
@@ -61,14 +61,14 @@ export async function scoreAllCompanies(
       scoreDimension('momentum', dims.momentum, flat, company.sector ?? undefined),
     ];
 
-    // V1 composite (preserved as dimension-only score)
+    // V1 composite (preserved for reference)
     const dimensionComposite = computeComposite(dimensionScores);
 
-    // Framework evaluators (Phase 2)
+    // Framework evaluators (still computed and stored, not blended into composite)
     const frameworkResults = evaluateAllFrameworks(enriched);
 
-    // V2 composite (classification-aware blending)
-    const compositeScore = computeCompositeV2(dimensionComposite, frameworkResults);
+    // V3 composite: geometric mean of dimensions (frameworks NOT blended in)
+    const compositeScore = computeGeometricMean(dimensionScores);
 
     // Classification
     const classification = classify(compositeScore, disqualified, rubric.classificationThresholds);
@@ -92,6 +92,11 @@ export async function scoreAllCompanies(
       frameworkResults,
       convictionLevel: conviction.level,
       convictionReasons: conviction.reasons,
+      // v3 financial health scores
+      piotroskiFScore: enriched.piotroskiFScore,
+      altmanZScore: enriched.altmanZScore,
+      beneishMScore: enriched.beneishMScore,
+      gateResults,
     });
   }
 

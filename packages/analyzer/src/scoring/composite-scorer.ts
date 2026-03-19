@@ -52,6 +52,27 @@ export function computeCompositeV2(
 }
 
 /**
+ * Compute composite score v3: weighted geometric mean of dimension scores.
+ * Multiplicative — a low score in any dimension drags the total down.
+ * Prevents high valuation from compensating terrible quality.
+ */
+export function computeGeometricMean(dimensions: DimensionScore[]): number {
+  if (dimensions.length === 0) return 0;
+
+  let weightedLogSum = 0;
+  let totalWeight = 0;
+
+  for (const dim of dimensions) {
+    const clamped = Math.max(1, Math.min(100, dim.score));
+    weightedLogSum += dim.weight * Math.log(clamped);
+    totalWeight += dim.weight;
+  }
+
+  if (totalWeight === 0) return 0;
+  return Math.round(Math.exp(weightedLogSum / totalWeight));
+}
+
+/**
  * Classify a company based on composite score and disqualification status.
  */
 export function classify(

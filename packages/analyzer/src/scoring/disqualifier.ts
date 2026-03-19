@@ -1,15 +1,16 @@
 import type { EnrichedSnapshot } from '../enrichment/flatten-v2.js';
 import { consistencyCount } from '../enrichment/trend-analyzer.js';
+import { checkHardGates, type GateResult } from './hard-gates.js';
 
 /**
  * Check automatic disqualifiers against snapshot data.
- * Returns an array of disqualification reasons (empty = not disqualified).
+ * Returns disqualification reasons (empty = not disqualified) and gate results.
  */
 export function checkDisqualifiers(
   snapshot: Record<string, unknown>,
   disqualifiers: string[],
   enriched?: EnrichedSnapshot,
-): string[] {
+): { reasons: string[]; gateResults?: GateResult[] } {
   const reasons: string[] = [];
 
   for (const rule of disqualifiers) {
@@ -18,7 +19,8 @@ export function checkDisqualifiers(
     }
   }
 
-  // Additional Phase 2 disqualifiers (from enriched data)
+  // Additional disqualifiers from enriched data
+  let gateResults: GateResult[] | undefined;
   if (enriched) {
     // Net losses in 3+ of last 5 years
     const profits5y = enriched.netProfitHistory.slice(0, 5);
@@ -35,9 +37,14 @@ export function checkDisqualifiers(
     if (promChange !== null && promChange < -10) {
       reasons.push(`Promoter holding declined ${Math.abs(promChange).toFixed(1)}pp in last 4 quarters`);
     }
+
+    // v3 hard gates
+    const gates = checkHardGates(enriched);
+    reasons.push(...gates.reasons);
+    gateResults = gates.gateResults;
   }
 
-  return reasons;
+  return { reasons, gateResults };
 }
 
 function evaluateDisqualifier(rule: string, data: Record<string, unknown>): boolean {

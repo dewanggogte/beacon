@@ -53,4 +53,10 @@ export interface CompanyAnalysis {
   quantClassification?: Classification;
   quantConvictionLevel?: import('./frameworks.js').ConvictionLevel;
   classificationSource?: 'quant' | 'ag4';
+
+  // v3 financial health scores
+  piotroskiFScore?: number;
+  altmanZScore?: number | null;
+  beneishMScore?: number | null;
+  gateResults?: Array<{ gate: string; passed: boolean; value: number | null; threshold: string }>;
 }

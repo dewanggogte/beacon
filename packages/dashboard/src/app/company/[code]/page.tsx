@@ -141,6 +141,33 @@ export default async function CompanyDetailPage({
         />
       ) : null}
 
+      {/* Financial Health Scores (v3) */}
+      {analysis && (analysis.piotroskiFScore != null || analysis.altmanZScore != null) && (
+        <div>
+          <h2 className="text-text-muted text-xs uppercase tracking-wider mb-3">Financial Health</h2>
+          <div className="grid grid-cols-3 gap-3">
+            <StatCard
+              label="Piotroski F-Score"
+              value={analysis.piotroskiFScore != null ? `${analysis.piotroskiFScore}/9` : '-'}
+              color={Number(analysis.piotroskiFScore ?? 0) >= 7 ? 'text-accent-green' : Number(analysis.piotroskiFScore ?? 0) <= 3 ? 'text-accent-red' : 'text-text-secondary'}
+              subtext={Number(analysis.piotroskiFScore ?? 0) >= 7 ? 'Strong' : Number(analysis.piotroskiFScore ?? 0) <= 3 ? 'Weak' : 'Moderate'}
+            />
+            <StatCard
+              label="Altman Z-Score"
+              value={analysis.altmanZScore != null ? Number(analysis.altmanZScore).toFixed(1) : '-'}
+              color={Number(analysis.altmanZScore ?? 0) >= 3 ? 'text-accent-green' : Number(analysis.altmanZScore ?? 0) < 1.8 ? 'text-accent-red' : 'text-accent-amber'}
+              subtext={Number(analysis.altmanZScore ?? 0) >= 3 ? 'Safe' : Number(analysis.altmanZScore ?? 0) < 1.8 ? 'Distress' : 'Grey zone'}
+            />
+            <StatCard
+              label="Beneish M-Score"
+              value={analysis.beneishMScore != null ? Number(analysis.beneishMScore).toFixed(1) : '-'}
+              color={Number(analysis.beneishMScore ?? 0) > -1.78 ? 'text-accent-red' : 'text-accent-green'}
+              subtext={Number(analysis.beneishMScore ?? 0) > -1.78 ? 'Manipulation flag' : 'Clean'}
+            />
+          </div>
+        </div>
+      )}
+
       {/* Dimension Scores */}
       {analysis && (
         <div>

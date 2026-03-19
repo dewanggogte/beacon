@@ -382,24 +382,19 @@ Each metric scored 0-100 with **sector-specific thresholds** (e.g., IT P/E of 30
 - Potential Short: 20-40
 - Strong Avoid: <20 or disqualified
 
-#### 8.1.1 Planned Scoring Model Additions
+#### 8.1.1 Quant Model v3 (replacing additive weighted average)
 
-The following quantitative models will be added to Layer 1, ordered by expected impact on identifying undervalued stocks:
+The v2 additive composite (framework scores + dimension scores blended by Lynch category weights) systematically overweights cheap, declining businesses. Run 7 analysis showed AG4 downgraded 100% of the top 100 quant-ranked companies, with 88/127 potential_longs reclassified to strong_avoid.
 
-| Model | Priority | What It Adds |
-|-------|----------|-------------|
-| **DCF Intrinsic Value** | P1 | 10-year DCF using owner earnings (net profit + depreciation − capex), 3-tier discount rates (12/15/18%), terminal growth 3-4%. Outputs intrinsic value + margin of safety %. Replaces simplistic P/E-only valuation. |
-| **Reverse DCF** | P2 | Given current market price, solve for implied growth rate. If market implies >25% growth for a stalwart, it's overpriced regardless of other metrics. |
-| **Piotroski F-Score** | P3 | 9-point binary quality score (profitability 4pts, leverage/liquidity 3pts, efficiency 2pts). Academic research shows +7.5% annual alpha. All input data already available in flattenV2. |
-| **Earnings Yield + FCF Yield** | P4 | EBIT/EV (earnings yield) and FCF/EV (FCF yield) — superior to P/E for cross-sector comparison. Accounts for capital structure differences. |
-| **Price Momentum** | P5 | 6-month and 12-month price returns from `price_history` table. Combined with value metrics for "trending value" strategy (value + momentum outperforms either alone in academic literature). |
-| **Quarterly Acceleration** | P6 | QoQ revenue and profit growth acceleration (is growth speeding up or slowing?). Leading indicator — catches turnarounds and deterioration 1-2 quarters before annual data shows it. |
-| **Greenblatt Magic Formula** | P7 | Rank all companies by earnings yield (EBIT/EV) + ROIC. Combined rank identifies cheap + quality stocks. Simple but powerful — 30% CAGR in Greenblatt's original study. |
-| **Altman Z-Score** | P10 | Bankruptcy prediction model (5 financial ratios). Z < 1.8 = distress zone → auto-disqualifier candidate. Adds to safety dimension. |
+**v3 replaces the scoring pipeline with three stages:**
 
-**Additional metrics for flattenV2 enrichment:**
-- **Beneish M-Score**: Earnings manipulation detection — flags companies likely inflating earnings via accruals.
-- **ROIC** (Return on Invested Capital): More accurate than ROE for companies with significant debt. Key input for Magic Formula and Buffett evaluator.
+1. **Hard gates**: 13 disqualification rules (existing 8 + Piotroski F-Score <= 2, Altman Z-Score < 1.8, ROCE 3Y avg < 6%, revenue decline 4+/5 years, Beneish M-Score > -1.78). Binary pass/fail. Failure = excluded from LLM.
+
+2. **Geometric mean composite**: `score = quality^0.30 * valuation^0.25 * governance^0.20 * safety^0.15 * momentum^0.10`. Multiplicative — a terrible quality score collapses the total regardless of valuation. Framework scores (Buffett/Graham/Lynch/Pabrai) still computed but feed into the ML ranker, not the composite.
+
+3. **XGBoost ranker**: Trained on historical AG4 evaluations to predict LLM agreement. Uses ~35 features (dimension scores, framework scores, raw metrics, trend slopes, new scores). LambdaMART objective (learning-to-rank). SHAP values identify which features actually matter. Tiering uses ML rank instead of composite score.
+
+Full spec: `docs/superpowers/specs/2026-03-20-quant-model-v3-design.md`
 
 ### 8.2 Layer 2: LLM Qualitative Analysis — v2.2 Independent Scoring (~1-20 min depending on provider)
 
@@ -737,18 +732,42 @@ PipelineError (base)
 - [ ] Tune Tier 1 count (top+bottom 50 vs 100)
 - [ ] Summarize AG1-3 outputs before AG4 (reduce Sonnet input tokens by 20-30%)
 
-### M10: Scoring Model Upgrades
-- [ ] DCF intrinsic value calculator (owner earnings, 3-tier discount rates, margin of safety %)
-- [ ] Reverse DCF (implied growth rate from current price)
-- [ ] Piotroski F-Score (9-point quality score from existing flattenV2 data)
-- [ ] Earnings yield (EBIT/EV) and FCF yield (FCF/EV) metrics
-- [ ] Price momentum (6m/12m returns from price_history)
-- [ ] Quarterly acceleration (QoQ revenue/profit growth rate of change)
-- [ ] Greenblatt Magic Formula (combined earnings yield + ROIC rank)
-- [ ] Altman Z-Score (bankruptcy prediction, <1.8 = new disqualifier)
-- [ ] Beneish M-Score (earnings manipulation detection)
-- [ ] ROIC metric in flattenV2 enrichment
-- [ ] Banking sector separate scoring path (different metrics for financial companies)
+### M10: Quant Model v3.0 — Hard Gates + Geometric Mean
+Spec: `docs/superpowers/specs/2026-03-20-quant-model-v3-design.md`
+
+**New metrics in flattenV2**
+- [ ] Piotroski F-Score (9 binary criteria)
+- [ ] Altman Z-Score (5-ratio model, Z'' variant for non-manufacturing)
+- [ ] Beneish M-Score (8-variable earnings manipulation detector)
+- [ ] ROCE trailing 3-year average
+- [ ] Revenue decline year count (out of last 5)
+
+**Hard gates (5 new disqualifiers)**
+- [ ] New hard-gates.ts: Piotroski <= 2, Z-Score < 1.8, ROCE 3Y avg < 6%, revenue decline 4+/5 years, M-Score > -1.78
+- [ ] Banking sector exceptions (skip ROCE floor, different Z-Score variant)
+- [ ] DB migration 0003: piotroski_f_score, altman_z_score, beneish_m_score, gate_results columns
+
+**Geometric mean composite**
+- [ ] Replace additive V2 composite with geometric mean of 5 dimension scores
+- [ ] Frameworks (Buffett/Graham/Lynch/Pabrai) still computed and stored, but not blended into composite
+- [ ] Recalibrate classification thresholds on historical data
+- [ ] Validate score distribution: target ~2-5% strong_long, ~10-15% potential_long
+
+**Supporting work**
+- [ ] Dashboard: Piotroski/Altman/Beneish on company detail page
+- [ ] Dashboard: update funnel numbers on overview page
+- [ ] Run validation: re-score run 7 data with new model, compare to AG4 outcomes
+
+### M10.1: Quant Model v3.1 — XGBoost Ranker (deferred until v3.0 produces balanced AG4 data)
+**Prerequisite**: 2-3 LLM runs on v3.0 with balanced AG4 label distribution (at least 10 positive classifications)
+
+- [ ] Training script (Python): extract features + AG4 labels from DB, train LambdaMART model
+- [ ] Walk-forward cross-validation across historical runs
+- [ ] SHAP feature importance analysis
+- [ ] Export model as JSON, load in Node.js for inference
+- [ ] Tiering by ML rank score instead of composite score
+- [ ] Retrain trigger after each LLM run completes
+- [ ] SHAP feature importance chart on dashboard /overview
 
 ### M11: LLM Pipeline v3
 - [ ] Expand AG1 coverage to all ~5,300 companies (with parallelization)
