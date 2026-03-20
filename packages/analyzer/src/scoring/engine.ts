@@ -1,11 +1,38 @@
 import { db, schema, logger } from '@screener/shared';
 import type { ScoringRubric, CompanyAnalysis, DimensionScore } from '@screener/shared';
 import { eq } from 'drizzle-orm';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { scoreDimension } from './dimension-scorer.js';
 import { computeComposite, computeGeometricMean, classify, computeConviction } from './composite-scorer.js';
 import { checkDisqualifiers } from './disqualifier.js';
 import { flattenV2, enrichedToFlat, type EnrichedSnapshot } from '../enrichment/flatten-v2.js';
 import { evaluateAllFrameworks } from '../frameworks/index.js';
+
+// Broad cyclical sector names (Screener.in uses these)
+const CYCLICAL_BROAD_SECTORS = new Set([
+  'commodities', 'energy', 'utilities', 'industrials',
+]);
+
+// Load granular cyclical sectors for sub-sector matching
+let cyclicalSubSectors: string[] | null = null;
+function loadCyclicalSectors(): string[] {
+  if (cyclicalSubSectors) return cyclicalSubSectors;
+  try {
+    const path = resolve(process.cwd(), 'principles', 'frameworks', 'cyclical-sectors.json');
+    const data = JSON.parse(readFileSync(path, 'utf-8'));
+    cyclicalSubSectors = (data.cyclicalSectors as string[]).map((s) => s.toLowerCase());
+  } catch {
+    cyclicalSubSectors = [];
+  }
+  return cyclicalSubSectors;
+}
+
+function isCyclicalSector(sector: string): boolean {
+  const lower = sector.toLowerCase();
+  if (CYCLICAL_BROAD_SECTORS.has(lower)) return true;
+  return loadCyclicalSectors().some((cs) => lower.includes(cs) || cs.includes(lower));
+}
 
 export interface ScoreResult {
   analyses: CompanyAnalysis[];
@@ -60,6 +87,80 @@ export async function scoreAllCompanies(
       scoreDimension('safety', dims.safety, flat, company.sector ?? undefined),
       scoreDimension('momentum', dims.momentum, flat, company.sector ?? undefined),
     ];
+
+    // v3.2 quality + valuation adjustments
+    const qualityDim = dimensionScores.find((d) => d.dimension === 'quality');
+    const valuationDim = dimensionScores.find((d) => d.dimension === 'valuation');
+
+    if (qualityDim) {
+      // Other income inflation: tiered penalty
+      // >60% → slash quality by 40% (ASHOKA-type: core business barely profitable)
+      // >40% → reduce quality by 25%
+      // >25% → reduce quality by 10%
+      const otherIncome = enriched.otherIncomeToProfit;
+      if (otherIncome != null && otherIncome > 0.25) {
+        const pctStr = Math.round(otherIncome * 100);
+        let factor: number;
+        if (otherIncome > 0.6) {
+          factor = 0.4;
+        } else if (otherIncome > 0.4) {
+          factor = 0.25;
+        } else {
+          factor = 0.1;
+        }
+        const penalty = Math.round(qualityDim.score * factor);
+        qualityDim.score = Math.max(1, qualityDim.score - penalty);
+        qualityDim.flags.push(`Other income ${pctStr}% of profit (-${penalty})`);
+      }
+    }
+
+    // Cyclical peak: penalize BOTH quality AND valuation
+    // When margins are far above historical average, current PE is misleadingly low
+    if (enriched.opmAvg5YToCurrentRatio != null && enriched.opmAvg5YToCurrentRatio > 1.3) {
+      const ratio = enriched.opmAvg5YToCurrentRatio;
+      // >2.0x → aggressive penalty (margins more than double the average)
+      // >1.5x → moderate penalty
+      // >1.3x → mild penalty
+      let qualPenalty: number;
+      let valPenalty: number;
+      if (ratio > 2.0) {
+        qualPenalty = 0.25;
+        valPenalty = 0.30;
+      } else if (ratio > 1.5) {
+        qualPenalty = 0.15;
+        valPenalty = 0.20;
+      } else {
+        qualPenalty = 0.08;
+        valPenalty = 0.10;
+      }
+
+      if (qualityDim) {
+        const qp = Math.round(qualityDim.score * qualPenalty);
+        qualityDim.score = Math.max(1, qualityDim.score - qp);
+        qualityDim.flags.push(`Cyclical peak: OPM ${ratio.toFixed(1)}x 5Y avg (-${qp})`);
+      }
+      if (valuationDim) {
+        const vp = Math.round(valuationDim.score * valPenalty);
+        valuationDim.score = Math.max(1, valuationDim.score - vp);
+        valuationDim.flags.push(`Cyclical peak valuation: PE on inflated margins (-${vp})`);
+      }
+    }
+
+    // v3.2: Cyclical sector + deteriorating fundamentals penalty
+    // If sector is cyclical AND Piotroski <= 4, the company has declining fundamentals
+    // even if current margins look high. Penalize quality and valuation.
+    if (isCyclicalSector(company.sector ?? '') && enriched.piotroskiFScore <= 4) {
+      if (qualityDim) {
+        const qp = Math.round(qualityDim.score * 0.15);
+        qualityDim.score = Math.max(1, qualityDim.score - qp);
+        qualityDim.flags.push(`Cyclical sector + Piotroski ${enriched.piotroskiFScore}/9 (-${qp})`);
+      }
+      if (valuationDim) {
+        const vp = Math.round(valuationDim.score * 0.15);
+        valuationDim.score = Math.max(1, valuationDim.score - vp);
+        valuationDim.flags.push(`Cyclical sector: earnings may be at peak (-${vp})`);
+      }
+    }
 
     // V1 composite (preserved for reference)
     const dimensionComposite = computeComposite(dimensionScores);

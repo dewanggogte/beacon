@@ -8,6 +8,7 @@ export async function saveSnapshot(
   companyId: number,
   scrapeRunId: number,
   snapshot: CompanySnapshot,
+  dataSource?: string,
 ): Promise<void> {
   await db.insert(schema.companySnapshots).values({
     companyId,
@@ -31,5 +32,6 @@ export async function saveSnapshot(
     ratios: snapshot.historicalRatios,
     shareholding: snapshot.shareholding,
     peerComparison: snapshot.peerComparison,
+    dataSource: dataSource ?? null,
   });
 }

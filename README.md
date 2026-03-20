@@ -126,6 +126,22 @@ npx tsx packages/analyzer/src/index.ts analyze --sectors=Pharma --limit=20
 
 When `--companies` or `--sectors` is used, all matching companies get full AG1-AG4 evaluation regardless of rank (no tiering). The scrape step is automatically skipped.
 
+### Quant model iteration
+
+The scoring model is improved through a human-in-the-loop cycle: score all companies, cross-validate the top 100 with Claude, identify divergences, fix the scoring code, repeat.
+
+```bash
+# First run: scores + prepares company files + prints Claude analysis batches
+npx tsx scripts/quant-iterate.ts run --version=v3.3 --run=7 --baseline=v3.2-final
+
+# (run Claude AG1-AG4 analysis on the printed batches)
+
+# Second run: detects analysis files, compares scores, generates report
+npx tsx scripts/quant-iterate.ts run --version=v3.3 --baseline=v3.2-final
+```
+
+Results are saved to `claude-llm-analysis/v{N}/` (local files, not DB). Key metric: agreement rate between quant score and Claude AG4 score within 10 points.
+
 ## Monorepo structure
 
 ```

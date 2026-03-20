@@ -754,9 +754,32 @@ Spec: `docs/superpowers/specs/2026-03-20-quant-model-v3-design.md`
 - [ ] Validate score distribution: target ~2-5% strong_long, ~10-15% potential_long
 
 **Supporting work**
-- [ ] Dashboard: Piotroski/Altman/Beneish on company detail page
+- [x] Dashboard: Piotroski/Altman/Beneish on company detail page
 - [ ] Dashboard: update funnel numbers on overview page
-- [ ] Run validation: re-score run 7 data with new model, compare to AG4 outcomes
+- [x] Run validation: re-score run 7 data with new model, compare to AG4 outcomes
+- [x] Claude cross-validation: AG1-AG4 analysis of top 100 (6% agreement rate, 33.7pt avg divergence)
+
+**Iterative improvement loop (in progress)**
+Model is refined through: quant eval → Claude analysis of top 100 → identify divergence patterns → fix scoring → repeat. Results saved to `claude-llm-analysis/v{N}/` (local files, not DB). Key metric: AG4 agreement rate within 10 pts (v3.0: 6%, v3.1: 6%, v3.2: 9%, target: >30%).
+
+```bash
+# One command, run twice per iteration:
+npx tsx scripts/quant-iterate.ts run --version=v{N} --run=7 --baseline=v{N-1}
+# → first run: score + prepare + print Claude batches
+# → second run (after Claude analysis): compare + report
+```
+
+v3.1 (implemented): OCF/profit 3Y gate, pledge text gate, data completeness gate, other income + cyclical penalties.
+- [x] OCF/profit ratio gate (3Y avg < 0.2)
+- [x] Fix pledge gate edge cases via cons text parsing (AFCONS/GPTINFRA caught)
+- [x] Minimum data completeness gate (< 5/10 series)
+- [x] Other income quality penalty (tiered: 25%/40%/60%)
+- [x] Cyclical peak quality penalty (OPM > 1.3x 5Y avg)
+
+v3.2 (in progress): Tighten remaining gaps found in v3.1 Claude analysis.
+- [ ] Acute OCF gate: latest year < 0.1 = disqualify (catches SHAKTIPUMP, POWERMECH)
+- [ ] Other income > 60% = hard gate disqualifier (catches ASHOKA)
+- [ ] Cyclical sector + Piotroski <= 4 = quality penalty (catches COALINDIA, NATIONALUM)
 
 ### M10.1: Quant Model v3.1 — XGBoost Ranker (deferred until v3.0 produces balanced AG4 data)
 **Prerequisite**: 2-3 LLM runs on v3.0 with balanced AG4 label distribution (at least 10 positive classifications)
@@ -768,6 +791,17 @@ Spec: `docs/superpowers/specs/2026-03-20-quant-model-v3-design.md`
 - [ ] Tiering by ML rank score instead of composite score
 - [ ] Retrain trigger after each LLM run completes
 - [ ] SHAP feature importance chart on dashboard /overview
+
+### M10.5: Scraper — Consolidated/Standalone Fix + Entity Classification
+**Problem**: 2,383/5,868 snapshots (41%) are empty because scraper hardcodes `/consolidated/` URL. Companies with standalone-only financials return empty pages. ~2,061 are real companies with data at the standalone URL.
+
+- [ ] Use search API URL directly (already contains `/consolidated/` or not) instead of hardcoding
+- [ ] Add `data_source` column to `company_snapshots` ('consolidated' | 'standalone')
+- [ ] Add `entity_type` column to `companies` ('company' | 'index' | 'etf' | 'unknown')
+- [ ] Detect indices/ETFs by name pattern (Nifty, Sensex, ETF) during company list ingestion
+- [ ] Post-scrape classification: if no sector + no financials after scrape → mark as 'unknown'
+- [ ] Re-scrape run 7 empty snapshots with correct URLs (standalone fallback for empties)
+- [ ] DB migration for new columns
 
 ### M11: LLM Pipeline v3
 - [ ] Expand AG1 coverage to all ~5,300 companies (with parallelization)

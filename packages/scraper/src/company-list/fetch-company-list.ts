@@ -14,6 +14,16 @@ export interface CompanyListEntry {
   screenerCode: string;
   name: string;
   url: string;
+  entityType: 'company' | 'index' | 'etf' | 'unknown';
+}
+
+const INDEX_PATTERN = /\b(nifty|sensex|bse\s?\d|cnx\d|s&p\s?bse)\b/i;
+const ETF_PATTERN = /\betf\b/i;
+
+function classifyEntity(name: string): 'company' | 'index' | 'etf' | 'unknown' {
+  if (INDEX_PATTERN.test(name)) return 'index';
+  if (ETF_PATTERN.test(name)) return 'etf';
+  return 'company';
 }
 
 /**
@@ -70,6 +80,7 @@ async function fetchViaSearchAPI(): Promise<Map<string, CompanyListEntry>> {
             screenerCode: match[1],
             name: result.name,
             url: result.url,
+            entityType: classifyEntity(result.name),
           });
         }
       }
@@ -127,6 +138,7 @@ async function fetchViaListingPages(
             screenerCode: match[1],
             name,
             url: href,
+            entityType: classifyEntity(name),
           });
           newOnPage++;
         }

@@ -8,6 +8,8 @@ import type { CompanyHeader } from '../company-detail/parse-header.js';
 export async function upsertCompany(
   screenerCode: string,
   header: CompanyHeader,
+  screenerUrl?: string,
+  entityType?: string,
 ): Promise<number> {
   // Try to find existing
   const existing = await db
@@ -54,7 +56,7 @@ export async function upsertCompany(
  * Bulk insert company list entries (for initial list fetch).
  */
 export async function bulkUpsertCompanies(
-  entries: { screenerCode: string; name: string }[],
+  entries: { screenerCode: string; name: string; url?: string; entityType?: string }[],
 ): Promise<void> {
   for (const entry of entries) {
     const existing = await db
@@ -67,7 +69,19 @@ export async function bulkUpsertCompanies(
       await db.insert(schema.companies).values({
         screenerCode: entry.screenerCode,
         name: entry.name,
+        screenerUrl: entry.url ?? null,
+        entityType: entry.entityType ?? null,
       });
+    } else {
+      // Update URL and entity type if not already set
+      await db
+        .update(schema.companies)
+        .set({
+          screenerUrl: entry.url ?? null,
+          entityType: entry.entityType ?? null,
+          updatedAt: new Date(),
+        })
+        .where(eq(schema.companies.id, existing[0].id));
     }
   }
 }

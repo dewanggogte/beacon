@@ -1,16 +1,24 @@
 import { db, schema } from '@screener/shared';
 import { eq, and, isNotNull } from 'drizzle-orm';
 
+export interface CompanyToScrape {
+  screenerCode: string;
+  screenerUrl: string | null;
+  entityType: string | null;
+}
+
 /**
- * Get the list of company screener codes that have NOT been scraped in the given run.
+ * Get companies that have NOT been scraped in the given run (with URL + entity info).
  */
-export async function getUnscrapedCompanyCodes(scrapeRunId: number): Promise<string[]> {
-  // Get all company codes
+export async function getUnscrapedCompanies(scrapeRunId: number): Promise<CompanyToScrape[]> {
   const allCompanies = await db
-    .select({ screenerCode: schema.companies.screenerCode })
+    .select({
+      screenerCode: schema.companies.screenerCode,
+      screenerUrl: schema.companies.screenerUrl,
+      entityType: schema.companies.entityType,
+    })
     .from(schema.companies);
 
-  // Get codes already scraped in this run
   const scraped = await db
     .select({ screenerCode: schema.companies.screenerCode })
     .from(schema.companySnapshots)
@@ -18,9 +26,16 @@ export async function getUnscrapedCompanyCodes(scrapeRunId: number): Promise<str
     .where(eq(schema.companySnapshots.scrapeRunId, scrapeRunId));
 
   const scrapedSet = new Set(scraped.map((s) => s.screenerCode));
-  return allCompanies
-    .filter((c) => !scrapedSet.has(c.screenerCode))
-    .map((c) => c.screenerCode);
+  return allCompanies.filter((c) => !scrapedSet.has(c.screenerCode));
+}
+
+/**
+ * Get the list of company screener codes that have NOT been scraped in the given run.
+ * @deprecated Use getUnscrapedCompanies instead
+ */
+export async function getUnscrapedCompanyCodes(scrapeRunId: number): Promise<string[]> {
+  const companies = await getUnscrapedCompanies(scrapeRunId);
+  return companies.map((c) => c.screenerCode);
 }
 
 /**

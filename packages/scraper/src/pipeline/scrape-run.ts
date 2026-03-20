@@ -11,7 +11,7 @@ import {
   completeScrapeRun,
   getLatestIncompleteRun,
 } from '../storage/save-run.js';
-import { getUnscrapedCompanyCodes, getCompanyCount, shuffle } from './progress-tracker.js';
+import { getUnscrapedCompanies, getCompanyCount, shuffle } from './progress-tracker.js';
 import { SCRAPER_CONFIG } from '../config.js';
 
 export interface ScrapeOptions {
@@ -41,28 +41,35 @@ export async function runScrape(options: ScrapeOptions): Promise<number> {
     logger.info(`Starting new scrape run #${runId} (${count} companies)`);
   }
 
-  // Get companies to scrape
-  let codes = await getUnscrapedCompanyCodes(runId);
-  logger.info(`${codes.length} companies remaining to scrape`);
+  // Get companies to scrape (with their stored URLs)
+  let companies = await getUnscrapedCompanies(runId);
+  logger.info(`${companies.length} companies remaining to scrape`);
 
   // Randomize order (anti-detection)
-  codes = shuffle([...codes]);
+  companies = shuffle([...companies]);
 
   // Apply limit
   if (limit && limit > 0) {
-    codes = codes.slice(0, limit);
-    logger.info(`Limited to ${codes.length} companies`);
+    companies = companies.slice(0, limit);
+    logger.info(`Limited to ${companies.length} companies`);
   }
 
   let successful = 0;
   let failed = 0;
   let consecutiveFailures = 0;
 
-  for (const code of codes) {
+  for (const company of companies) {
+    const code = company.screenerCode;
     try {
       await rateLimiter.waitForNextRequest();
 
-      const url = `${SCRAPER_CONFIG.baseUrl}${SCRAPER_CONFIG.companyPath}${code}/consolidated/`;
+      // Use stored URL from search API, falling back to consolidated
+      const storedUrl = company.screenerUrl;
+      const isConsolidated = storedUrl ? storedUrl.includes('/consolidated/') : true;
+      const url = storedUrl
+        ? `${SCRAPER_CONFIG.baseUrl}${storedUrl}`
+        : `${SCRAPER_CONFIG.baseUrl}${SCRAPER_CONFIG.companyPath}${code}/consolidated/`;
+      const dataSource = isConsolidated ? 'consolidated' : 'standalone';
 
       // Fetch with retry
       const html = await withRetry(() => fetchPage(url));
@@ -71,27 +78,28 @@ export async function runScrape(options: ScrapeOptions): Promise<number> {
       const snapshot = parseCompanyPage(html);
 
       // Save company master record (upsert)
-      const companyId = await upsertCompany(code, snapshot.header);
+      const companyId = await upsertCompany(code, snapshot.header, storedUrl ?? undefined, company.entityType ?? undefined);
 
-      // Save snapshot
-      await saveSnapshot(companyId, runId, snapshot);
+      // Save snapshot with data source
+      await saveSnapshot(companyId, runId, snapshot, dataSource);
 
       successful++;
       consecutiveFailures = 0;
       await incrementRunCount(runId, 'successful');
 
       logger.info(
-        `[${successful + failed}/${codes.length}] ${code}: ` +
+        `[${successful + failed}/${companies.length}] ${code}: ` +
         `PE=${snapshot.ratios.stockPe ?? 'N/A'} ` +
         `MCap=${snapshot.ratios.marketCap ?? 'N/A'} ` +
-        `ROE=${snapshot.ratios.roe ?? 'N/A'}`,
+        `ROE=${snapshot.ratios.roe ?? 'N/A'} ` +
+        `[${dataSource}]`,
       );
     } catch (error) {
       failed++;
       consecutiveFailures++;
       await incrementRunCount(runId, 'failed');
 
-      logger.error(`[${successful + failed}/${codes.length}] ${code}: FAILED — ${(error as Error).message}`);
+      logger.error(`[${successful + failed}/${companies.length}] ${code}: FAILED — ${(error as Error).message}`);
 
       // If too many consecutive failures, something is seriously wrong (likely blocked)
       if (consecutiveFailures >= SCRAPER_CONFIG.maxConsecutiveFailures) {

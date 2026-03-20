@@ -161,6 +161,13 @@ export interface EnrichedSnapshot {
   beneishMScore: number | null;
   roceTrailing3Y: number | null;
   revenueDeclineYears: number;
+
+  // --- v3.1 additional metrics ---
+  ocfToNetProfitAvg3Y: number | null;
+  otherIncomeToProfit: number | null;
+  promoterPledgePct: number | null;
+  dataCompletenessScore: number;
+  opmAvg5YToCurrentRatio: number | null;
 }
 
 /**
@@ -265,6 +272,11 @@ export function flattenV2(
     beneishMScore: null,
     roceTrailing3Y: null,
     revenueDeclineYears: 0,
+    ocfToNetProfitAvg3Y: null,
+    otherIncomeToProfit: null,
+    promoterPledgePct: null,
+    dataCompletenessScore: 0,
+    opmAvg5YToCurrentRatio: null,
   };
 
   // --- Annual P&L ---
@@ -614,6 +626,66 @@ export function flattenV2(
     if (curr != null && prev != null && prev > 0 && curr < prev) declineCount++;
   }
   enriched.revenueDeclineYears = declineCount;
+
+  // v3.1 additional metrics
+
+  // OCF / Net Profit ratio (3-year average)
+  const ocfRatios: number[] = [];
+  for (let i = 0; i < 3; i++) {
+    const ocf = enriched.ocfHistory[i];
+    const np = enriched.netProfitHistory[i];
+    if (ocf != null && np != null && np > 0) {
+      ocfRatios.push(ocf / np);
+    }
+  }
+  enriched.ocfToNetProfitAvg3Y = ocfRatios.length > 0
+    ? ocfRatios.reduce((s, v) => s + v, 0) / ocfRatios.length
+    : null;
+
+  // Other income to profit ratio
+  // Primary: parse from cons text (Screener.in explicitly states it)
+  // Fallback: compute from P&L (net profit - operating profit)
+  const consText = (enriched.cons ?? []).join(' ');
+  const otherIncomeMatch = consText.match(/other income of Rs\.?\s*([\d,]+)\s*Cr/i);
+  const latestProfit = enriched.netProfitHistory[0];
+  if (otherIncomeMatch && latestProfit != null && latestProfit > 0) {
+    const otherIncomeCr = parseFloat(otherIncomeMatch[1]!.replace(/,/g, ''));
+    enriched.otherIncomeToProfit = otherIncomeCr / latestProfit;
+  } else {
+    // Fallback: P&L-based approximation
+    const latestOpProfit = enriched.operatingProfitHistory[0];
+    if (latestProfit != null && latestProfit > 0 && latestOpProfit != null) {
+      const otherIncome = latestProfit - latestOpProfit;
+      enriched.otherIncomeToProfit = otherIncome > 0 ? otherIncome / latestProfit : 0;
+    }
+  }
+
+  // Promoter pledge from cons text
+  const pledgeMatch = consText.match(/[Pp]romoters?\s+have\s+pledged\s+(\d+\.?\d*)%/);
+  if (pledgeMatch) {
+    enriched.promoterPledgePct = parseFloat(pledgeMatch[1]!);
+  }
+
+  // Data completeness score (0-10): how many key data series have 3+ years
+  let completeness = 0;
+  if (enriched.revenueHistory.filter((v) => v != null).length >= 3) completeness++;
+  if (enriched.netProfitHistory.filter((v) => v != null).length >= 3) completeness++;
+  if (enriched.ocfHistory.filter((v) => v != null).length >= 3) completeness++;
+  if (enriched.roceHistory.filter((v) => v != null).length >= 3) completeness++;
+  if (enriched.roeHistory.filter((v) => v != null).length >= 3) completeness++;
+  if (enriched.borrowingsHistory.filter((v) => v != null).length >= 3) completeness++;
+  if (enriched.totalAssetsHistory.filter((v) => v != null).length >= 3) completeness++;
+  if (enriched.opmHistory.filter((v) => v != null).length >= 3) completeness++;
+  if (enriched.promoterHoldingHistory.filter((v) => v != null).length >= 4) completeness++;
+  if (enriched.epsHistory.filter((v) => v != null).length >= 3) completeness++;
+  enriched.dataCompletenessScore = completeness;
+
+  // Cyclical peak indicator: current OPM vs 5Y average OPM
+  const currentOpm = enriched.opmHistory[0];
+  const avg5yOpm = enriched.opmAvg5Y;
+  if (currentOpm != null && avg5yOpm != null && avg5yOpm > 0) {
+    enriched.opmAvg5YToCurrentRatio = currentOpm / avg5yOpm;
+  }
 
   return enriched;
 }

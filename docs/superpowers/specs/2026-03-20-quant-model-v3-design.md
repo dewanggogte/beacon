@@ -159,3 +159,88 @@ Train a gradient-boosted tree model to predict AG4 classification. LambdaMART ob
 - Tiering uses ML rank instead of composite score
 - SHAP chart on dashboard /overview page
 - Retrain trigger after each LLM run
+
+---
+
+## Iterative improvement loop
+
+The quant model is refined through a human-in-the-loop iteration cycle using Claude as a cross-validation layer.
+
+### Loop structure
+
+One command, run twice per iteration:
+
+```bash
+# First run: score + prepare + print Claude analysis batches
+npx tsx scripts/quant-iterate.ts run --version=v{N} --run=7 --baseline=v{N-1}
+
+# (run Claude AG1-AG4 analysis on the printed batches — 5 parallel agents)
+
+# Second run: compare + report (auto-detects analysis files)
+npx tsx scripts/quant-iterate.ts run --version=v{N} --baseline=v{N-1}
+```
+
+The `run` command is state-aware:
+- No scores.json → runs scoring + prepare, prints batches, stops
+- Scores exist but no batch files → reminds to run Claude analysis
+- Both exist → runs compare + report
+
+Individual subcommands also available: `score`, `prepare`, `compare`, `report`.
+
+### File structure
+
+```
+claude-llm-analysis/
+  v3.0/                    # First iteration (completed 2026-03-20)
+    scores.json            # Quant scores for all companies
+    manifest.json          # Top 100 non-disqualified
+    batch-{1-5}-analysis.json  # Claude AG1-AG4 analysis (20 companies each)
+    combined-analysis.json # All 100 merged
+    comparison-report.json # Divergence stats
+    company-{CODE}.json    # Per-company financial data
+    SUMMARY.md             # Narrative report
+  v3.1/                    # Second iteration
+    ...
+  v3.2-final/              # Third iteration
+    ...
+```
+
+### Versioning
+
+During iteration, results are saved to local JSON files (not the DB). This allows multiple model versions to coexist without migrations. Once a version is finalized:
+- Results are written to the DB
+- A `model_version` column is added to `analysis_results`
+- Unique constraint changes from `(company_id, scrape_run_id)` to `(company_id, scrape_run_id, model_version)`
+
+### Key metric
+
+**AG4 agreement rate**: percentage of top 100 companies where Claude AG4 score is within 10 points of quant score. Target: >30% (v3.0 baseline: 6%).
+
+### v3.0 findings (2026-03-20)
+
+100 companies analyzed. 3 confirmed strong_long, 32 potential_long, 42 neutral, 16 potential_short, 7 strong_avoid. Average divergence: 33.7 points.
+
+Top gaps identified:
+1. No OCF/profit ratio check (SHAKTIPUMP: 20 Cr OCF vs 329 Cr profit)
+2. No other income inflation detection (ASHOKA: 80%+ profit from asset sales)
+3. Cyclical peak scoring (commodities scored on unsustainably high current earnings)
+4. Pledge gate not catching edge cases (AFCONS 53.5%, GPTINFRA 50.8%)
+5. No minimum data completeness gate (GAUDIUMIVF: 1 quarter of governance data)
+
+### v3.1 changes and findings (2026-03-20)
+
+**Changes**: 3 new gates (OCF/profit 3Y avg < 0.2, pledge from cons text > 50%, data completeness < 5/10) + quality penalties (other income > 25%, cyclical peak OPM > 1.3x avg).
+
+**Results**: 6 strong_longs confirmed (doubled from 3). 31.3pt avg divergence (-2.4). 546 more disqualified. AFCONS/GPTINFRA now caught by pledge gate. SOLARWORLD caught by Beneish + OCF.
+
+**Remaining gaps**:
+1. SHAKTIPUMP (5% latest-year OCF) passes because 3Y avg is 0.68
+2. ASHOKA (82% other income) only -3pt quality penalty — too weak
+3. COALINDIA/HINDALCO/NMDC: cyclical peak not detected (consistently high margins across 5Y window)
+
+### v3.2 changes (in progress)
+
+**Three fixes**:
+1. **Acute OCF gate**: Disqualify if latest-year OCF/profit < 0.1 regardless of 3Y average. Catches SHAKTIPUMP (5%) and POWERMECH (~0%).
+2. **Other income hard gate**: Move extreme other income (> 60% of profit) from penalty to disqualifier. Catches ASHOKA (82%).
+3. **Cyclical sector penalty**: For companies in cyclical sectors with Piotroski <= 4, apply 15% quality penalty. Catches deteriorating cyclicals like COALINDIA (Piotroski 3) even when margins are consistently high.

@@ -22,6 +22,8 @@ export const companies = pgTable('companies', {
   sector: varchar('sector', { length: 100 }),
   industry: varchar('industry', { length: 100 }),
   website: varchar('website', { length: 500 }),
+  screenerUrl: varchar('screener_url', { length: 500 }),
+  entityType: varchar('entity_type', { length: 10 }),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
 });
@@ -72,6 +74,7 @@ export const companySnapshots = pgTable(
     ratios: jsonb('ratios'),
     shareholding: jsonb('shareholding'),
     peerComparison: jsonb('peer_comparison'),
+    dataSource: varchar('data_source', { length: 20 }),
   },
   (table) => [
     uniqueIndex('uq_snapshot_company_run').on(table.companyId, table.scrapeRunId),
