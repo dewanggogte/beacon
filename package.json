@@ -23,11 +23,14 @@
     "pipeline:quick": "npx tsx scripts/run-pipeline.ts --skip-llm",
     "db:generate": "npm run db:generate -w @screener/shared",
     "db:migrate": "npm run db:migrate -w @screener/shared",
-    "db:studio": "npm run db:studio -w @screener/shared"
+    "db:studio": "npm run db:studio -w @screener/shared",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
     "tsx": "^4.19.0",
-    "typescript": "^5.7.0"
+    "typescript": "^5.7.0",
+    "vitest": "^4.1.0"
   }
 }
