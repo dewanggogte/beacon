@@ -41,3 +41,6 @@ chrome-profile/
 # Ops notes (private)
 OPS.md
 claude-llm-analysis/
+
+# Claude Code local settings (personal, not shared)
+.claude/settings.local.json
