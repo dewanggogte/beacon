@@ -1,0 +1,46 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: beacon-analyze-manual
+  namespace: beacon
+spec:
+  backoffLimit: 0
+  template:
+    spec:
+      nodeSelector:
+        node-type: main-server
+      restartPolicy: Never
+      containers:
+        - name: analyze
+          image: ghcr.io/dewanggogte/beacon:latest
+          command: ["/docker-entrypoint.sh", "pipeline:analyze", "--run=7", "--limit=10"]
+          envFrom:
+            - secretRef:
+                name: beacon-secrets
+          env:
+            - name: NODE_ENV
+              value: "production"
+            - name: LLM_PROVIDER
+              value: "local"
+            - name: LOCAL_LLM_URL
+              value: "http://192.168.0.42:8000"
+            - name: LOCAL_LLM_MODEL
+              value: "qwen3.5-35b-a3b"
+          resources:
+            requests:
+              cpu: 500m
+              memory: 512Mi
+            limits:
+              cpu: "2"
+              memory: 2Gi
+          volumeMounts:
+            - name: beacon-data
+              mountPath: /app/reports
+              subPath: reports
+            - name: beacon-data
+              mountPath: /app/logs
+              subPath: logs
+      volumes:
+        - name: beacon-data
+          persistentVolumeClaim:
+            claimName: beacon-data
