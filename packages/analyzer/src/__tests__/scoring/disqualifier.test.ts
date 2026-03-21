@@ -140,13 +140,10 @@ describe('checkDisqualifiers — basic rules', () => {
     expect(reasons).toHaveLength(0);
   });
 
-  it('does NOT skip debt/equity for "Financial Services" (inlined check uses "finance" not "financial")', () => {
-    // NOTE: This is a known inconsistency — hard-gates.ts isBankingOrNBFC()
-    // uses 'financial' (matches), but disqualifier.ts uses 'finance' (doesn't
-    // match "financial services"). The hard gates correctly skip for this sector.
+  it('skips debt/equity check for Financial Services sector', () => {
     const snapshot = { debtToEquity: 10, sector: 'Financial Services' };
     const { reasons } = checkDisqualifiers(snapshot, ['Debt to equity > 3']);
-    expect(reasons).toContain('Debt to equity > 3');
+    expect(reasons).toHaveLength(0);
   });
 
   it('handles fallback generic rule "someField > 100"', () => {
