@@ -85,7 +85,7 @@ function evaluateDisqualifier(rule: string, data: Record<string, unknown>): bool
   if (lower.includes('debt') && lower.includes('equity') && lower.includes('3')) {
     // Skip for banking/NBFC sectors (handled externally via sector data)
     const sector = String(data['sector'] ?? '').toLowerCase();
-    if (sector.includes('bank') || sector.includes('nbfc') || sector.includes('finance')) {
+    if (sector.includes('bank') || sector.includes('nbfc') || sector.includes('financial')) {
       return false;
     }
     const debtToEquity = getNumericValue(data, 'debtToEquity');
