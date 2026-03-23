@@ -123,6 +123,30 @@ The scraper was built with the assumption that all companies on Screener.in have
 
 ---
 
+## 2026-03-22: Quant-only re-runs overwrite LLM data
+
+### The problem
+
+Run 9 had 198 AG4-classified companies and 599 with LLM analysis from a successful Qwen pipeline run. Then run 11 (a quant-only analysis on the same data) saved results with `llmAnalysis: null` for all companies. The upsert on `(company_id, scrape_run_id)` blindly overwrote all fields including LLM data with nulls. The dashboard then picked run 11 (higher ID, no LLM) over run 9 (lower ID, has LLM).
+
+### Root cause
+
+The `save-analysis.ts` upsert does `set: { ...values }` which replaces every column. When the LLM is skipped or fails, LLM fields are null in the values object, so the upsert nulls out whatever LLM data was there from a prior analysis on the same scrape run.
+
+### The fix
+
+Two changes:
+
+1. **Selective upsert**: LLM fields (`llmAnalysis`, `llmAdjustment`, `classificationSource`) only overwrite existing data if the new values are non-null. A quant-only run preserves existing LLM results instead of erasing them.
+
+2. **Dashboard run selection**: `getLatestRunId()` now prefers runs with AG4 data, falling back to the latest run with any analysis. This prevents a quant-only run from shadowing a prior LLM-enriched run.
+
+### Key insight
+
+The pipeline treats each save as a full replacement, but in practice runs are incremental — quant scores update frequently, LLM runs happen less often. The save logic needs to be additive for LLM fields, not replacement.
+
+---
+
 ## 2026-03-20: Beacon rebrand
 
 Renamed from "Screener Automation" to "Beacon — Autonomous Value Research". Required updating: package.json name, GitHub repo name (dewanggogte/screener-automation → dewanggogte/beacon), GHCR container image tag, all K8s manifests (namespace, service names, ingress, sealed secrets), ArgoCD app, deploy workflow, all documentation, memory files.

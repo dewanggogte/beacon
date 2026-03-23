@@ -66,8 +66,15 @@ export function CompanyTable({ data, compact }: CompanyTableProps) {
   const [filterClass, setFilterClass] = useState<string>('all');
   const [filterLynch, setFilterLynch] = useState<string>('all');
   const [filterConviction, setFilterConviction] = useState<string>('all');
+  const [filterSector, setFilterSector] = useState<string>('all');
+  const [filterSource, setFilterSource] = useState<string>('all');
 
   const hasFrameworks = data.some((r) => r.lynchClassification);
+
+  const sectors = useMemo(() => {
+    const s = new Set(data.map((r) => r.sector).filter(Boolean) as string[]);
+    return [...s].sort();
+  }, [data]);
 
   const filtered = useMemo(() => {
     let result = data;
@@ -89,8 +96,14 @@ export function CompanyTable({ data, compact }: CompanyTableProps) {
     if (filterConviction !== 'all') {
       result = result.filter((r) => r.convictionLevel === filterConviction);
     }
+    if (filterSector !== 'all') {
+      result = result.filter((r) => r.sector === filterSector);
+    }
+    if (filterSource !== 'all') {
+      result = result.filter((r) => (r.classificationSource ?? 'quant') === filterSource);
+    }
     return result;
-  }, [data, search, filterClass, filterLynch, filterConviction]);
+  }, [data, search, filterClass, filterLynch, filterConviction, filterSector, filterSource]);
 
   const sorted = useMemo(() => {
     return [...filtered].sort((a, b) => {
@@ -124,10 +137,11 @@ export function CompanyTable({ data, compact }: CompanyTableProps) {
     }
   };
 
-  const SortHeader = ({ label, field }: { label: string; field: SortKey }) => (
+  const SortHeader = ({ label, field, tooltip }: { label: string; field: SortKey; tooltip?: string }) => (
     <th
       className="px-3 py-2 text-left text-xs font-medium text-text-muted uppercase tracking-wider cursor-pointer hover:text-text-primary select-none whitespace-nowrap"
       onClick={() => handleSort(field)}
+      title={tooltip}
     >
       {label} {sortKey === field ? (sortAsc ? '↑' : '↓') : ''}
     </th>
@@ -183,6 +197,25 @@ export function CompanyTable({ data, compact }: CompanyTableProps) {
             </select>
           </>
         )}
+        <select
+          value={filterSector}
+          onChange={(e) => setFilterSector(e.target.value)}
+          className="bg-bg-secondary border border-border rounded px-3 py-1.5 text-sm text-text-primary focus:outline-none focus:border-accent-cyan"
+        >
+          <option value="all">All Sectors</option>
+          {sectors.map((s) => (
+            <option key={s} value={s}>{s}</option>
+          ))}
+        </select>
+        <select
+          value={filterSource}
+          onChange={(e) => setFilterSource(e.target.value)}
+          className="bg-bg-secondary border border-border rounded px-3 py-1.5 text-sm text-text-primary focus:outline-none focus:border-accent-cyan"
+        >
+          <option value="all">All Sources</option>
+          <option value="quant">Quant Only</option>
+          <option value="ag4">AG4 (LLM)</option>
+        </select>
         <div className="text-text-muted text-sm self-center">
           {sorted.length} results
         </div>
@@ -191,30 +224,30 @@ export function CompanyTable({ data, compact }: CompanyTableProps) {
         <table className="w-full text-sm">
           <thead className="bg-bg-secondary">
             <tr>
-              <SortHeader label="#" field="rankOverall" />
+              <SortHeader label="#" field="rankOverall" tooltip="Rank by composite score (geometric mean of 5 dimensions)" />
               <SortHeader label="Company" field="companyName" />
               {!compact && <SortHeader label="Sector" field="sector" />}
-              <SortHeader label="Score" field="finalScore" />
-              <th className="px-3 py-2 text-left text-xs font-medium text-text-muted uppercase">Class</th>
+              <SortHeader label="Score" field="finalScore" tooltip="Composite score (0-100): geometric mean of quality, valuation, governance, safety, momentum" />
+              <th className="px-3 py-2 text-left text-xs font-medium text-text-muted uppercase" title="Classification: strong_long (>=80), potential_long (>=65), neutral (>=40), potential_short (>=20), strong_avoid (<20 or disqualified)">Class</th>
               {hasFrameworks && !compact && (
                 <>
-                  <th className="px-3 py-2 text-left text-xs font-medium text-text-muted uppercase">Lynch</th>
-                  <th className="px-3 py-2 text-left text-xs font-medium text-text-muted uppercase">Conv.</th>
-                  <SortHeader label="Buf" field="buffettScore" />
-                  <SortHeader label="Gra" field="grahamScore" />
-                  <SortHeader label="Pab" field="pabraiRiskScore" />
+                  <th className="px-3 py-2 text-left text-xs font-medium text-text-muted uppercase" title="Peter Lynch category: fast grower, stalwart, slow grower, cyclical, turnaround, asset play">Lynch</th>
+                  <th className="px-3 py-2 text-left text-xs font-medium text-text-muted uppercase" title="Conviction level based on framework alignment: high (score>=80, 2+ frameworks>=75), medium, low, none">Conv.</th>
+                  <SortHeader label="Buf" field="buffettScore" tooltip="Buffett quality score (0-100): 10 criteria including ROE consistency, operating margins, low debt, owner earnings" />
+                  <SortHeader label="Gra" field="grahamScore" tooltip="Graham value score (0-100): 10 criteria including P/E<15, P/B<1.5, positive earnings, dividend continuity" />
+                  <SortHeader label="Pab" field="pabraiRiskScore" tooltip="Pabrai risk score (0-100, higher=safer): debt, interest coverage, OCF predictability, revenue stability" />
                 </>
               )}
               {!compact && !hasFrameworks && (
                 <>
-                  <SortHeader label="Val" field="valuationScore" />
-                  <SortHeader label="Qual" field="qualityScore" />
-                  <SortHeader label="Gov" field="governanceScore" />
-                  <SortHeader label="Safe" field="safetyScore" />
-                  <SortHeader label="Mom" field="momentumScore" />
+                  <SortHeader label="Val" field="valuationScore" tooltip="Valuation dimension (25% weight): P/E, P/B, PEG, EV/EBITDA" />
+                  <SortHeader label="Qual" field="qualityScore" tooltip="Quality dimension (30% weight): ROE, ROCE, debt/equity, current ratio, FCF, profit and revenue growth" />
+                  <SortHeader label="Gov" field="governanceScore" tooltip="Governance dimension (20% weight): promoter holding, pledge percentage, institutional holding" />
+                  <SortHeader label="Safe" field="safetyScore" tooltip="Safety dimension (15% weight): market cap, free float" />
+                  <SortHeader label="Mom" field="momentumScore" tooltip="Momentum dimension (10% weight): ROE trend, debt trend, margin trend, promoter holding trend" />
                 </>
               )}
-              <th className="px-3 py-2 text-left text-xs font-medium text-text-muted uppercase">Chg</th>
+              <th className="px-3 py-2 text-left text-xs font-medium text-text-muted uppercase" title="Week-over-week score change vs previous analysis run">Chg</th>
             </tr>
           </thead>
           <tbody>

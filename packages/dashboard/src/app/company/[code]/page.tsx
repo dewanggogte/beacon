@@ -66,6 +66,14 @@ export default async function CompanyDetailPage({
   const quantClass = String(analysis?.quantClassification ?? '');
   const wasOverridden = classSource === 'ag4' && quantClass && quantClass !== analysis?.classification;
 
+  const dimensionTooltips: Record<string, string> = {
+    'Valuation': 'P/E, P/B, PEG, EV/EBITDA — is it cheap relative to earnings and assets?',
+    'Quality': 'ROE, ROCE, debt/equity, current ratio, FCF, profit and revenue growth',
+    'Governance': 'Promoter holding %, pledge %, institutional holding — alignment and oversight',
+    'Safety': 'Market cap and free float — liquidity and size protection',
+    'Momentum': 'ROE trend, debt trend, margin trend, promoter holding trend — direction of travel',
+  };
+
   return (
     <div className="max-w-5xl space-y-8">
       {/* Header */}
@@ -90,6 +98,7 @@ export default async function CompanyDetailPage({
             label="Final Score"
             value={Number(analysis.finalScore ?? 0).toFixed(0)}
             color={scoreColor(Number(analysis.finalScore ?? 0))}
+            subtext="Geometric mean of 5 dimension scores"
           />
           <div className="bg-bg-card border border-border rounded-lg p-4">
             <div className="text-text-muted text-xs uppercase tracking-wider flex items-center gap-2">
@@ -129,6 +138,48 @@ export default async function CompanyDetailPage({
         </div>
       ) : null}
 
+      {/* LLM Summary (shown prominently when available) */}
+      {llm?.trendNarrative && (
+        <div className="bg-bg-card border border-border rounded-lg p-5">
+          <h2 className="text-text-muted text-xs uppercase tracking-wider mb-3">LLM Summary</h2>
+          <div className="text-sm text-text-secondary leading-relaxed mb-3">{llm.trendNarrative}</div>
+          {llm.catalysts && llm.catalysts.length > 0 && (
+            <div className="mb-3">
+              <div className="text-accent-green text-xs font-medium mb-1">Catalysts</div>
+              <ul className="text-sm text-text-secondary space-y-0.5">
+                {llm.catalysts.map((c, i) => <li key={i}>- {c}</li>)}
+              </ul>
+            </div>
+          )}
+          {llm.riskFactors && llm.riskFactors.length > 0 && (
+            <div className="mb-3">
+              <div className="text-accent-red text-xs font-medium mb-1">Risk Factors</div>
+              <ul className="text-sm text-text-secondary space-y-0.5">
+                {llm.riskFactors.map((r, i) => <li key={i}>- {r}</li>)}
+              </ul>
+            </div>
+          )}
+          <div className="flex gap-4 text-xs text-text-muted border-t border-border pt-2">
+            {llm.confidence && <span>Confidence: <span className="text-text-secondary">{llm.confidence}</span></span>}
+            {llm.qualitativeAdjustment !== undefined && (
+              <span>Adjustment: <span className={llm.qualitativeAdjustment > 0 ? 'text-accent-green' : llm.qualitativeAdjustment < 0 ? 'text-accent-red' : 'text-text-secondary'}>
+                {llm.qualitativeAdjustment > 0 ? '+' : ''}{llm.qualitativeAdjustment}
+              </span></span>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Multi-Agent Analysis (detailed tabs) */}
+      {analysis && (analysis.llmFundamentals || analysis.llmSynthesis) ? (
+        <AgentAnalysisPanel
+          fundamentals={analysis.llmFundamentals}
+          governance={analysis.llmGovernance}
+          risk={analysis.llmRisk}
+          synthesis={analysis.llmSynthesis}
+        />
+      ) : null}
+
       {/* Framework Scores */}
       {analysis?.buffettScore ? (
         <FrameworkScores
@@ -150,19 +201,19 @@ export default async function CompanyDetailPage({
               label="Piotroski F-Score"
               value={analysis.piotroskiFScore != null ? `${analysis.piotroskiFScore}/9` : '-'}
               color={Number(analysis.piotroskiFScore ?? 0) >= 7 ? 'text-accent-green' : Number(analysis.piotroskiFScore ?? 0) <= 3 ? 'text-accent-red' : 'text-text-secondary'}
-              subtext={Number(analysis.piotroskiFScore ?? 0) >= 7 ? 'Strong' : Number(analysis.piotroskiFScore ?? 0) <= 3 ? 'Weak' : 'Moderate'}
+              subtext={Number(analysis.piotroskiFScore ?? 0) >= 7 ? 'Strong fundamentals (profitability, leverage, efficiency)' : Number(analysis.piotroskiFScore ?? 0) <= 3 ? 'Weak fundamentals — multiple criteria failing' : 'Mixed fundamentals — some criteria passing'}
             />
             <StatCard
               label="Altman Z-Score"
               value={analysis.altmanZScore != null ? Number(analysis.altmanZScore).toFixed(1) : '-'}
               color={Number(analysis.altmanZScore ?? 0) >= 3 ? 'text-accent-green' : Number(analysis.altmanZScore ?? 0) < 1.8 ? 'text-accent-red' : 'text-accent-amber'}
-              subtext={Number(analysis.altmanZScore ?? 0) >= 3 ? 'Safe' : Number(analysis.altmanZScore ?? 0) < 1.8 ? 'Distress' : 'Grey zone'}
+              subtext={Number(analysis.altmanZScore ?? 0) >= 3 ? 'Low bankruptcy risk' : Number(analysis.altmanZScore ?? 0) < 1.8 ? 'Elevated bankruptcy risk' : 'Inconclusive bankruptcy prediction'}
             />
             <StatCard
               label="Beneish M-Score"
               value={analysis.beneishMScore != null ? Number(analysis.beneishMScore).toFixed(1) : '-'}
               color={Number(analysis.beneishMScore ?? 0) > -1.78 ? 'text-accent-red' : 'text-accent-green'}
-              subtext={Number(analysis.beneishMScore ?? 0) > -1.78 ? 'Manipulation flag' : 'Clean'}
+              subtext={Number(analysis.beneishMScore ?? 0) > -1.78 ? 'Accounting patterns suggest possible manipulation' : 'No signs of earnings manipulation'}
             />
           </div>
         </div>
@@ -177,7 +228,7 @@ export default async function CompanyDetailPage({
               const score = Number(d.score ?? 0);
               return (
                 <div key={d.name} className="bg-bg-card border border-border rounded-lg p-3 text-center">
-                  <div className="text-text-muted text-xs mb-1">{d.name} ({d.weight}%)</div>
+                  <div className="text-text-muted text-xs mb-1" title={dimensionTooltips[d.name] ?? ''}>{d.name} ({d.weight}%)</div>
                   <div className={`text-xl font-bold ${scoreColor(score)}`}>{score}</div>
                   <div className="mt-2 h-2 bg-bg-secondary rounded-full overflow-hidden">
                     <div
@@ -195,51 +246,11 @@ export default async function CompanyDetailPage({
         </div>
       )}
 
-      {/* Multi-Agent LLM Analysis */}
-      {analysis && (analysis.llmFundamentals || analysis.llmSynthesis) ? (
-        <AgentAnalysisPanel
-          fundamentals={analysis.llmFundamentals}
-          governance={analysis.llmGovernance}
-          risk={analysis.llmRisk}
-          synthesis={analysis.llmSynthesis}
-        />
-      ) : null}
-
-      {/* Legacy LLM Analysis (for companies with only single-shot LLM) */}
-      {llm && !analysis?.llmSynthesis ? (
-        <div>
-          <h2 className="text-text-muted text-xs uppercase tracking-wider mb-3">LLM Analysis</h2>
-          <div className="bg-bg-card border border-border rounded-lg p-4 space-y-3">
-            {llm.trendNarrative && (
-              <div>
-                <div className="text-text-muted text-xs mb-1">Trend Narrative</div>
-                <div className="text-sm">{llm.trendNarrative}</div>
-              </div>
-            )}
-            {llm.riskFactors && llm.riskFactors.length > 0 && (
-              <div>
-                <div className="text-accent-red text-xs mb-1">Risk Factors</div>
-                <ul className="text-sm space-y-1">
-                  {llm.riskFactors.map((r, i) => <li key={i}>- {r}</li>)}
-                </ul>
-              </div>
-            )}
-            {llm.catalysts && llm.catalysts.length > 0 && (
-              <div>
-                <div className="text-accent-green text-xs mb-1">Catalysts</div>
-                <ul className="text-sm space-y-1">
-                  {llm.catalysts.map((c, i) => <li key={i}>- {c}</li>)}
-                </ul>
-              </div>
-            )}
-            <div className="flex gap-6 text-xs text-text-muted border-t border-border pt-2">
-              {llm.confidence && <span>Confidence: {llm.confidence}</span>}
-              {llm.qualitativeAdjustment !== undefined && (
-                <span>Adjustment: {llm.qualitativeAdjustment > 0 ? '+' : ''}{llm.qualitativeAdjustment}</span>
-              )}
-              {llm.reasoning && <span>{llm.reasoning}</span>}
-            </div>
-          </div>
+      {/* Legacy LLM reasoning (only if no structured llmAnalysis) */}
+      {llm?.reasoning && !llm?.trendNarrative ? (
+        <div className="bg-bg-card border border-border rounded-lg p-4">
+          <h2 className="text-text-muted text-xs uppercase tracking-wider mb-2">LLM Reasoning</h2>
+          <div className="text-sm text-text-secondary">{llm.reasoning}</div>
         </div>
       ) : null}
 
@@ -255,10 +266,10 @@ export default async function CompanyDetailPage({
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="text-text-muted text-xs">
-                        <th className="text-left py-1">Metric</th>
-                        <th className="text-right py-1">Value</th>
-                        <th className="text-right py-1">Score</th>
-                        <th className="text-right py-1">Assessment</th>
+                        <th className="text-left py-1" title="Individual metric scored 0-100 with sector-specific thresholds">Metric</th>
+                        <th className="text-right py-1" title="Raw value from financial data">Value</th>
+                        <th className="text-right py-1" title="Normalized score (0-100) based on sector-adjusted thresholds">Score</th>
+                        <th className="text-right py-1" title="excellent (>=85), good (>=70), acceptable (>=45), poor (>=15), red_flag (<15)">Assessment</th>
                       </tr>
                     </thead>
                     <tbody>
