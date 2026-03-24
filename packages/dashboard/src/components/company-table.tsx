@@ -141,9 +141,10 @@ export function CompanyTable({ data, compact }: CompanyTableProps) {
     <th
       className="px-3 py-2 text-left text-xs font-medium text-text-muted uppercase tracking-wider cursor-pointer hover:text-text-primary select-none whitespace-nowrap"
       onClick={() => handleSort(field)}
-      title={tooltip}
     >
-      {label} {sortKey === field ? (sortAsc ? '↑' : '↓') : ''}
+      {label}
+      {tooltip && <span className="inline-block ml-0.5 text-text-muted/50 cursor-help" title={tooltip}>?</span>}
+      {' '}{sortKey === field ? (sortAsc ? '↑' : '↓') : ''}
     </th>
   );
 
@@ -228,11 +229,11 @@ export function CompanyTable({ data, compact }: CompanyTableProps) {
               <SortHeader label="Company" field="companyName" />
               {!compact && <SortHeader label="Sector" field="sector" />}
               <SortHeader label="Score" field="finalScore" tooltip="Composite score (0-100): geometric mean of quality, valuation, governance, safety, momentum" />
-              <th className="px-3 py-2 text-left text-xs font-medium text-text-muted uppercase" title="Classification: strong_long (>=80), potential_long (>=65), neutral (>=40), potential_short (>=20), strong_avoid (<20 or disqualified)">Class</th>
+              <th className="px-3 py-2 text-left text-xs font-medium text-text-muted uppercase">Class <span className="text-text-muted/50 cursor-help" title="Classification: strong_long (>=80), potential_long (>=65), neutral (>=40), potential_short (>=20), strong_avoid (<20 or disqualified)">?</span></th>
               {hasFrameworks && !compact && (
                 <>
-                  <th className="px-3 py-2 text-left text-xs font-medium text-text-muted uppercase" title="Peter Lynch category: fast grower, stalwart, slow grower, cyclical, turnaround, asset play">Lynch</th>
-                  <th className="px-3 py-2 text-left text-xs font-medium text-text-muted uppercase" title="Conviction level based on framework alignment: high (score>=80, 2+ frameworks>=75), medium, low, none">Conv.</th>
+                  <th className="px-3 py-2 text-left text-xs font-medium text-text-muted uppercase">Lynch <span className="text-text-muted/50 cursor-help" title="Peter Lynch category: fast grower, stalwart, slow grower, cyclical, turnaround, asset play">?</span></th>
+                  <th className="px-3 py-2 text-left text-xs font-medium text-text-muted uppercase">Conv. <span className="text-text-muted/50 cursor-help" title="Conviction level based on framework alignment: high (score>=80, 2+ frameworks>=75), medium, low, none">?</span></th>
                   <SortHeader label="Buf" field="buffettScore" tooltip="Buffett quality score (0-100): 10 criteria including ROE consistency, operating margins, low debt, owner earnings" />
                   <SortHeader label="Gra" field="grahamScore" tooltip="Graham value score (0-100): 10 criteria including P/E<15, P/B<1.5, positive earnings, dividend continuity" />
                   <SortHeader label="Pab" field="pabraiRiskScore" tooltip="Pabrai risk score (0-100, higher=safer): debt, interest coverage, OCF predictability, revenue stability" />
@@ -247,7 +248,7 @@ export function CompanyTable({ data, compact }: CompanyTableProps) {
                   <SortHeader label="Mom" field="momentumScore" tooltip="Momentum dimension (10% weight): ROE trend, debt trend, margin trend, promoter holding trend" />
                 </>
               )}
-              <th className="px-3 py-2 text-left text-xs font-medium text-text-muted uppercase" title="Week-over-week score change vs previous analysis run">Chg</th>
+              <th className="px-3 py-2 text-left text-xs font-medium text-text-muted uppercase">Chg <span className="text-text-muted/50 cursor-help" title="Week-over-week score change vs previous analysis run">?</span></th>
             </tr>
           </thead>
           <tbody>

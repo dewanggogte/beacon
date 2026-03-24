@@ -228,7 +228,7 @@ export default async function CompanyDetailPage({
               const score = Number(d.score ?? 0);
               return (
                 <div key={d.name} className="bg-bg-card border border-border rounded-lg p-3 text-center">
-                  <div className="text-text-muted text-xs mb-1" title={dimensionTooltips[d.name] ?? ''}>{d.name} ({d.weight}%)</div>
+                  <div className="text-text-muted text-xs mb-1">{d.name} ({d.weight}%) {dimensionTooltips[d.name] && <span className="text-text-muted/50 cursor-help" title={dimensionTooltips[d.name]}>?</span>}</div>
                   <div className={`text-xl font-bold ${scoreColor(score)}`}>{score}</div>
                   <div className="mt-2 h-2 bg-bg-secondary rounded-full overflow-hidden">
                     <div
@@ -266,10 +266,10 @@ export default async function CompanyDetailPage({
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="text-text-muted text-xs">
-                        <th className="text-left py-1" title="Individual metric scored 0-100 with sector-specific thresholds">Metric</th>
-                        <th className="text-right py-1" title="Raw value from financial data">Value</th>
-                        <th className="text-right py-1" title="Normalized score (0-100) based on sector-adjusted thresholds">Score</th>
-                        <th className="text-right py-1" title="excellent (>=85), good (>=70), acceptable (>=45), poor (>=15), red_flag (<15)">Assessment</th>
+                        <th className="text-left py-1">Metric <span className="text-text-muted/50 cursor-help" title="Individual metric scored 0-100 with sector-specific thresholds">?</span></th>
+                        <th className="text-right py-1">Value <span className="text-text-muted/50 cursor-help" title="Raw value from financial data">?</span></th>
+                        <th className="text-right py-1">Score <span className="text-text-muted/50 cursor-help" title="Normalized score (0-100) based on sector-adjusted thresholds">?</span></th>
+                        <th className="text-right py-1">Assessment <span className="text-text-muted/50 cursor-help" title="excellent (>=85), good (>=70), acceptable (>=45), poor (>=15), red_flag (<15)">?</span></th>
                       </tr>
                     </thead>
                     <tbody>
