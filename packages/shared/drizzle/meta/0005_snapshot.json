@@ -1,0 +1,1303 @@
+{
+  "id": "b563771d-dd87-4437-a695-eab38454495e",
+  "prevId": "d6b58d45-250c-4809-9e3e-861d06197833",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.analysis_history": {
+      "name": "analysis_history",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "company_id": {
+          "name": "company_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "scrape_run_id": {
+          "name": "scrape_run_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "final_score": {
+          "name": "final_score",
+          "type": "numeric",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "classification": {
+          "name": "classification",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "conviction_level": {
+          "name": "conviction_level",
+          "type": "varchar(10)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "classification_source": {
+          "name": "classification_source",
+          "type": "varchar(10)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "dimension_scores": {
+          "name": "dimension_scores",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "framework_scores": {
+          "name": "framework_scores",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "lynch_category": {
+          "name": "lynch_category",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "disqualified": {
+          "name": "disqualified",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false,
+          "default": false
+        },
+        "disqualification_reasons": {
+          "name": "disqualification_reasons",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "key_metrics": {
+          "name": "key_metrics",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "analysis_history_company_run_idx": {
+          "name": "analysis_history_company_run_idx",
+          "columns": [
+            {
+              "expression": "company_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "scrape_run_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "analysis_history_run_idx": {
+          "name": "analysis_history_run_idx",
+          "columns": [
+            {
+              "expression": "scrape_run_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "analysis_history_company_time_idx": {
+          "name": "analysis_history_company_time_idx",
+          "columns": [
+            {
+              "expression": "company_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "analysis_history_company_id_companies_id_fk": {
+          "name": "analysis_history_company_id_companies_id_fk",
+          "tableFrom": "analysis_history",
+          "tableTo": "companies",
+          "columnsFrom": [
+            "company_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "analysis_history_scrape_run_id_scrape_runs_id_fk": {
+          "name": "analysis_history_scrape_run_id_scrape_runs_id_fk",
+          "tableFrom": "analysis_history",
+          "tableTo": "scrape_runs",
+          "columnsFrom": [
+            "scrape_run_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.analysis_results": {
+      "name": "analysis_results",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "company_id": {
+          "name": "company_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "scrape_run_id": {
+          "name": "scrape_run_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "analyzed_at": {
+          "name": "analyzed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "now()"
+        },
+        "valuation_score": {
+          "name": "valuation_score",
+          "type": "numeric",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "quality_score": {
+          "name": "quality_score",
+          "type": "numeric",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "governance_score": {
+          "name": "governance_score",
+          "type": "numeric",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "safety_score": {
+          "name": "safety_score",
+          "type": "numeric",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "momentum_score": {
+          "name": "momentum_score",
+          "type": "numeric",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "composite_score": {
+          "name": "composite_score",
+          "type": "numeric",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "disqualified": {
+          "name": "disqualified",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false,
+          "default": false
+        },
+        "disqualification_reasons": {
+          "name": "disqualification_reasons",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "metric_details": {
+          "name": "metric_details",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "llm_analysis": {
+          "name": "llm_analysis",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "llm_adjustment": {
+          "name": "llm_adjustment",
+          "type": "numeric",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "llm_fundamentals": {
+          "name": "llm_fundamentals",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "llm_governance": {
+          "name": "llm_governance",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "llm_risk": {
+          "name": "llm_risk",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "llm_synthesis": {
+          "name": "llm_synthesis",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "final_score": {
+          "name": "final_score",
+          "type": "numeric",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "classification": {
+          "name": "classification",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "rank_overall": {
+          "name": "rank_overall",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "rank_in_sector": {
+          "name": "rank_in_sector",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "buffett_score": {
+          "name": "buffett_score",
+          "type": "numeric",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "graham_score": {
+          "name": "graham_score",
+          "type": "numeric",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "pabrai_risk_score": {
+          "name": "pabrai_risk_score",
+          "type": "numeric",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "lynch_category_score": {
+          "name": "lynch_category_score",
+          "type": "numeric",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "lynch_classification": {
+          "name": "lynch_classification",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "framework_details": {
+          "name": "framework_details",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "conviction_level": {
+          "name": "conviction_level",
+          "type": "varchar(10)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "conviction_reasons": {
+          "name": "conviction_reasons",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "quant_classification": {
+          "name": "quant_classification",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "quant_conviction_level": {
+          "name": "quant_conviction_level",
+          "type": "varchar(10)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "classification_source": {
+          "name": "classification_source",
+          "type": "varchar(10)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "piotroski_f_score": {
+          "name": "piotroski_f_score",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "altman_z_score": {
+          "name": "altman_z_score",
+          "type": "numeric",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "beneish_m_score": {
+          "name": "beneish_m_score",
+          "type": "numeric",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "gate_results": {
+          "name": "gate_results",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "score_change": {
+          "name": "score_change",
+          "type": "numeric",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "classification_change": {
+          "name": "classification_change",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "uq_analysis_company_run": {
+          "name": "uq_analysis_company_run",
+          "columns": [
+            {
+              "expression": "company_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "scrape_run_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_analysis_classification": {
+          "name": "idx_analysis_classification",
+          "columns": [
+            {
+              "expression": "classification",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_analysis_score": {
+          "name": "idx_analysis_score",
+          "columns": [
+            {
+              "expression": "final_score",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_analysis_run": {
+          "name": "idx_analysis_run",
+          "columns": [
+            {
+              "expression": "scrape_run_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "analysis_results_company_id_companies_id_fk": {
+          "name": "analysis_results_company_id_companies_id_fk",
+          "tableFrom": "analysis_results",
+          "tableTo": "companies",
+          "columnsFrom": [
+            "company_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "analysis_results_scrape_run_id_scrape_runs_id_fk": {
+          "name": "analysis_results_scrape_run_id_scrape_runs_id_fk",
+          "tableFrom": "analysis_results",
+          "tableTo": "scrape_runs",
+          "columnsFrom": [
+            "scrape_run_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.backtest_runs": {
+      "name": "backtest_runs",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "now()"
+        },
+        "analysis_date": {
+          "name": "analysis_date",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "scrape_run_id": {
+          "name": "scrape_run_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "evaluation_date": {
+          "name": "evaluation_date",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "holding_period_days": {
+          "name": "holding_period_days",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "config": {
+          "name": "config",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "picks": {
+          "name": "picks",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "performance": {
+          "name": "performance",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status": {
+          "name": "status",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "'pending'"
+        }
+      },
+      "indexes": {
+        "idx_backtest_run": {
+          "name": "idx_backtest_run",
+          "columns": [
+            {
+              "expression": "scrape_run_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_backtest_status": {
+          "name": "idx_backtest_status",
+          "columns": [
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "backtest_runs_scrape_run_id_scrape_runs_id_fk": {
+          "name": "backtest_runs_scrape_run_id_scrape_runs_id_fk",
+          "tableFrom": "backtest_runs",
+          "tableTo": "scrape_runs",
+          "columnsFrom": [
+            "scrape_run_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.companies": {
+      "name": "companies",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "screener_code": {
+          "name": "screener_code",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "bse_code": {
+          "name": "bse_code",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "nse_code": {
+          "name": "nse_code",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "sector": {
+          "name": "sector",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "industry": {
+          "name": "industry",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "website": {
+          "name": "website",
+          "type": "varchar(500)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "screener_url": {
+          "name": "screener_url",
+          "type": "varchar(500)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "entity_type": {
+          "name": "entity_type",
+          "type": "varchar(10)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "companies_screener_code_unique": {
+          "name": "companies_screener_code_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "screener_code"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.company_snapshots": {
+      "name": "company_snapshots",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "company_id": {
+          "name": "company_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "scrape_run_id": {
+          "name": "scrape_run_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "scraped_at": {
+          "name": "scraped_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "now()"
+        },
+        "market_cap": {
+          "name": "market_cap",
+          "type": "numeric",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "current_price": {
+          "name": "current_price",
+          "type": "numeric",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "high_52w": {
+          "name": "high_52w",
+          "type": "numeric",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "low_52w": {
+          "name": "low_52w",
+          "type": "numeric",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "stock_pe": {
+          "name": "stock_pe",
+          "type": "numeric",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "book_value": {
+          "name": "book_value",
+          "type": "numeric",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "dividend_yield": {
+          "name": "dividend_yield",
+          "type": "numeric",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "roce": {
+          "name": "roce",
+          "type": "numeric",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "roe": {
+          "name": "roe",
+          "type": "numeric",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "face_value": {
+          "name": "face_value",
+          "type": "numeric",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "pros": {
+          "name": "pros",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cons": {
+          "name": "cons",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "quarterly_results": {
+          "name": "quarterly_results",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "annual_pl": {
+          "name": "annual_pl",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "balance_sheet": {
+          "name": "balance_sheet",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cash_flow": {
+          "name": "cash_flow",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ratios": {
+          "name": "ratios",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "shareholding": {
+          "name": "shareholding",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "peer_comparison": {
+          "name": "peer_comparison",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "data_source": {
+          "name": "data_source",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "uq_snapshot_company_run": {
+          "name": "uq_snapshot_company_run",
+          "columns": [
+            {
+              "expression": "company_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "scrape_run_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_snapshots_company": {
+          "name": "idx_snapshots_company",
+          "columns": [
+            {
+              "expression": "company_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_snapshots_run": {
+          "name": "idx_snapshots_run",
+          "columns": [
+            {
+              "expression": "scrape_run_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_snapshots_market_cap": {
+          "name": "idx_snapshots_market_cap",
+          "columns": [
+            {
+              "expression": "market_cap",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "company_snapshots_company_id_companies_id_fk": {
+          "name": "company_snapshots_company_id_companies_id_fk",
+          "tableFrom": "company_snapshots",
+          "tableTo": "companies",
+          "columnsFrom": [
+            "company_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "company_snapshots_scrape_run_id_scrape_runs_id_fk": {
+          "name": "company_snapshots_scrape_run_id_scrape_runs_id_fk",
+          "tableFrom": "company_snapshots",
+          "tableTo": "scrape_runs",
+          "columnsFrom": [
+            "scrape_run_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.macro_snapshots": {
+      "name": "macro_snapshots",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "snapshot_date": {
+          "name": "snapshot_date",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "repo_rate": {
+          "name": "repo_rate",
+          "type": "numeric",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cpi": {
+          "name": "cpi",
+          "type": "numeric",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "gdp_growth": {
+          "name": "gdp_growth",
+          "type": "numeric",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "nifty_pe": {
+          "name": "nifty_pe",
+          "type": "numeric",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "india_vix": {
+          "name": "india_vix",
+          "type": "numeric",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "usd_inr": {
+          "name": "usd_inr",
+          "type": "numeric",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "bond_yield_10y": {
+          "name": "bond_yield_10y",
+          "type": "numeric",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "regime": {
+          "name": "regime",
+          "type": "varchar(30)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "notes": {
+          "name": "notes",
+          "type": "varchar(500)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "idx_macro_date": {
+          "name": "idx_macro_date",
+          "columns": [
+            {
+              "expression": "snapshot_date",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "macro_snapshots_snapshot_date_unique": {
+          "name": "macro_snapshots_snapshot_date_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "snapshot_date"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.price_history": {
+      "name": "price_history",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "company_id": {
+          "name": "company_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "price_date": {
+          "name": "price_date",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "close_price": {
+          "name": "close_price",
+          "type": "numeric",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "source": {
+          "name": "source",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "'yfinance'"
+        }
+      },
+      "indexes": {
+        "uq_price_company_date": {
+          "name": "uq_price_company_date",
+          "columns": [
+            {
+              "expression": "company_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "price_date",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_price_company": {
+          "name": "idx_price_company",
+          "columns": [
+            {
+              "expression": "company_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_price_date": {
+          "name": "idx_price_date",
+          "columns": [
+            {
+              "expression": "price_date",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "price_history_company_id_companies_id_fk": {
+          "name": "price_history_company_id_companies_id_fk",
+          "tableFrom": "price_history",
+          "tableTo": "companies",
+          "columnsFrom": [
+            "company_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.scrape_runs": {
+      "name": "scrape_runs",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "started_at": {
+          "name": "started_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "completed_at": {
+          "name": "completed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "total_companies": {
+          "name": "total_companies",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "successful": {
+          "name": "successful",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "default": 0
+        },
+        "failed": {
+          "name": "failed",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "default": 0
+        },
+        "status": {
+          "name": "status",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "'running'"
+        },
+        "market_commentary": {
+          "name": "market_commentary",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {},
+  "schemas": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}

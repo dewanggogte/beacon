@@ -217,6 +217,33 @@ switch (command) {
     break;
   }
 
+  case 'backfill-history': {
+    import('@screener/shared').then(({ db, schema }) => {
+      import('drizzle-orm').then(({ asc }) => {
+        import('./pipeline/save-analysis-history.js').then(({ saveAnalysisHistory }) => {
+          db.selectDistinct({ scrapeRunId: schema.analysisResults.scrapeRunId })
+            .from(schema.analysisResults)
+            .orderBy(asc(schema.analysisResults.scrapeRunId))
+            .then(async (rows) => {
+              console.log(`Found ${rows.length} runs to backfill`);
+              for (const { scrapeRunId } of rows) {
+                if (scrapeRunId != null) {
+                  await saveAnalysisHistory(scrapeRunId);
+                }
+              }
+              console.log('Backfill complete');
+              process.exit(0);
+            })
+            .catch((err) => {
+              logger.error(`Backfill failed: ${(err as Error).message}`);
+              process.exit(1);
+            });
+        });
+      });
+    });
+    break;
+  }
+
   case 'report':
     logger.info('Generating report from saved results...');
     logger.warn('Standalone report generation not yet implemented — run analyze instead');
@@ -233,6 +260,7 @@ switch (command) {
     console.log('  macro regime         Show current macro regime');
     console.log('  rubric               Validate and display scoring rubric');
     console.log('  report               Generate markdown reports');
+    console.log('  backfill-history     Seed analysis_history from existing analysis_results');
     console.log('');
     console.log('Options (analyze):');
     console.log('  --skip-llm           Skip LLM qualitative analysis (Layer 1 only)');

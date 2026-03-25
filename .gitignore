@@ -41,3 +41,4 @@ chrome-profile/
 # Ops notes (private)
 OPS.md
 claude-llm-analysis/
+.superpowers/

@@ -12,8 +12,8 @@ export default async function PipelinePage() {
   return (
     <div className="max-w-3xl space-y-8">
       <div>
-        <h1 className="text-xl font-bold mb-1">Pipeline Status</h1>
-        <p className="text-text-muted text-sm">Scraping and analysis pipeline health</p>
+        <h1 className="text-xl font-bold text-text-primary dark:text-dark-text-primary mb-1">Pipeline Status</h1>
+        <p className="text-text-muted dark:text-dark-text-muted text-sm">Scraping and analysis pipeline health</p>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
@@ -27,30 +27,30 @@ export default async function PipelinePage() {
       </div>
 
       {status.latestRun && (
-        <div className="bg-bg-card border border-border rounded-lg p-4">
-          <h2 className="text-text-muted text-xs uppercase tracking-wider mb-3">Latest Scrape Run</h2>
+        <div className="bg-bg-card dark:bg-dark-bg-card border border-border dark:border-dark-border rounded-lg p-4">
+          <h2 className="text-text-muted dark:text-dark-text-muted text-xs uppercase tracking-wider mb-3">Latest Scrape Run</h2>
           <div className="space-y-2 text-sm">
             <div className="flex justify-between">
-              <span className="text-text-muted">Run ID</span>
-              <span>#{status.latestRun.id}</span>
+              <span className="text-text-muted dark:text-dark-text-muted">Run ID</span>
+              <span className="text-text-primary dark:text-dark-text-primary">#{status.latestRun.id}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-text-muted">Started At</span>
-              <span>{new Date(status.latestRun.startedAt).toLocaleString()}</span>
+              <span className="text-text-muted dark:text-dark-text-muted">Started At</span>
+              <span className="text-text-primary dark:text-dark-text-primary">{new Date(status.latestRun.startedAt).toLocaleString()}</span>
             </div>
             {status.latestRun.completedAt && (
               <div className="flex justify-between">
-                <span className="text-text-muted">Completed At</span>
-                <span>{new Date(status.latestRun.completedAt).toLocaleString()}</span>
+                <span className="text-text-muted dark:text-dark-text-muted">Completed At</span>
+                <span className="text-text-primary dark:text-dark-text-primary">{new Date(status.latestRun.completedAt).toLocaleString()}</span>
               </div>
             )}
             <div className="flex justify-between">
-              <span className="text-text-muted">Companies Scraped</span>
+              <span className="text-text-muted dark:text-dark-text-muted">Companies Scraped</span>
               <span className="text-accent-green">{status.latestRun.successful ?? 0}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-text-muted">Failed</span>
-              <span className={Number(status.latestRun.failed ?? 0) > 0 ? 'text-accent-red' : 'text-text-muted'}>
+              <span className="text-text-muted dark:text-dark-text-muted">Failed</span>
+              <span className={Number(status.latestRun.failed ?? 0) > 0 ? 'text-accent-red' : 'text-text-muted dark:text-dark-text-muted'}>
                 {status.latestRun.failed ?? 0}
               </span>
             </div>

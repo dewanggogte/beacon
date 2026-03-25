@@ -19,7 +19,19 @@
   --color-accent-cyan: #b85a3b;    /* Terracotta — primary accent, replaces cyan */
 
   --font-serif: 'Source Serif 4', Georgia, serif;
+
+  /* Dark mode palette — warm charcoal, not pure black */
+  --color-dark-bg-primary: #1a1a1a;
+  --color-dark-bg-secondary: #242424;
+  --color-dark-bg-card: #2a2a2a;
+  --color-dark-bg-hover: #333333;
+  --color-dark-border: #3a3a3a;
+  --color-dark-text-primary: #e8e6e3;
+  --color-dark-text-secondary: #999999;
+  --color-dark-text-muted: #666666;
 }
+
+@variant dark (&:where(.dark, .dark *));
 
 body {
   background: var(--color-bg-primary);
@@ -27,6 +39,11 @@ body {
   font-family: var(--font-serif);
   font-size: 15px;
   line-height: 1.6;
+}
+
+.dark body, body:where(.dark *) {
+  background: var(--color-dark-bg-primary);
+  color: var(--color-dark-text-primary);
 }
 
 /* Scrollbar — subtle for light theme */
@@ -43,4 +60,8 @@ body {
 }
 ::-webkit-scrollbar-thumb:hover {
   background: var(--color-text-muted);
+}
+
+table {
+  font-variant-numeric: tabular-nums;
 }

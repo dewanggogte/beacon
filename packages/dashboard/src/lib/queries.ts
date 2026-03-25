@@ -1,5 +1,5 @@
 import { db, schema } from '@screener/shared';
-import { desc, eq, sql, and, isNull, or } from 'drizzle-orm';
+import { desc, eq, sql, and, isNull, or, inArray } from 'drizzle-orm';
 
 export async function getLatestRunId(): Promise<number | null> {
   // Find the latest scrape run that has analysis results
@@ -10,6 +10,17 @@ export async function getLatestRunId(): Promise<number | null> {
     .orderBy(desc(schema.analysisResults.scrapeRunId))
     .limit(1);
   return runs[0]?.scrapeRunId ?? null;
+}
+
+export async function getRunDate(runId: number): Promise<Date | null> {
+  const result = await db
+    .select({ completedAt: schema.scrapeRuns.completedAt, startedAt: schema.scrapeRuns.startedAt })
+    .from(schema.scrapeRuns)
+    .where(eq(schema.scrapeRuns.id, runId))
+    .limit(1);
+  const row = result[0];
+  if (!row) return null;
+  return row.completedAt ?? row.startedAt ?? null;
 }
 
 export async function getSummaryStats(runId: number) {
@@ -89,9 +100,29 @@ export async function getTopCompanies(
 
 export async function getAllRankings(runId: number) {
   const results = await db
-    .select(companyColumns)
+    .select({
+      ...companyColumns,
+      pe: schema.companySnapshots.stockPe,
+      roce: schema.companySnapshots.roce,
+      roe: schema.companySnapshots.roe,
+      dividendYield: schema.companySnapshots.dividendYield,
+      marketCap: schema.companySnapshots.marketCap,
+      bookValue: schema.companySnapshots.bookValue,
+      quarterlyResults: schema.companySnapshots.quarterlyResults,
+      frameworkDetails: schema.analysisResults.frameworkDetails,
+      piotroskiFScore: schema.analysisResults.piotroskiFScore,
+      altmanZScore: schema.analysisResults.altmanZScore,
+      beneishMScore: schema.analysisResults.beneishMScore,
+    })
     .from(schema.analysisResults)
     .innerJoin(schema.companies, eq(schema.analysisResults.companyId, schema.companies.id))
+    .leftJoin(
+      schema.companySnapshots,
+      and(
+        eq(schema.companySnapshots.companyId, schema.companies.id),
+        eq(schema.companySnapshots.scrapeRunId, runId),
+      ),
+    )
     .where(eq(schema.analysisResults.scrapeRunId, runId))
     .orderBy(desc(schema.analysisResults.finalScore));
 
@@ -242,4 +273,147 @@ export async function getPipelineStatus() {
     totalCompanies: totalCompanies[0]?.count ?? 0,
     analyzedCompanies: latestAnalysis[0]?.count ?? 0,
   };
+}
+
+export async function getSectorMedians(sector: string, runId: number) {
+  const results = await db
+    .select({
+      pe: sql<number | null>`percentile_cont(0.5) WITHIN GROUP (ORDER BY ${schema.companySnapshots.stockPe}::numeric)`,
+      roce: sql<number | null>`percentile_cont(0.5) WITHIN GROUP (ORDER BY ${schema.companySnapshots.roce}::numeric)`,
+      roe: sql<number | null>`percentile_cont(0.5) WITHIN GROUP (ORDER BY ${schema.companySnapshots.roe}::numeric)`,
+      dividendYield: sql<number | null>`percentile_cont(0.5) WITHIN GROUP (ORDER BY ${schema.companySnapshots.dividendYield}::numeric)`,
+      marketCap: sql<number | null>`percentile_cont(0.5) WITHIN GROUP (ORDER BY ${schema.companySnapshots.marketCap}::numeric)`,
+    })
+    .from(schema.companySnapshots)
+    .innerJoin(schema.companies, eq(schema.companySnapshots.companyId, schema.companies.id))
+    .where(
+      and(
+        eq(schema.companySnapshots.scrapeRunId, runId),
+        eq(schema.companies.sector, sector),
+      ),
+    );
+
+  return results[0] ?? { pe: null, roce: null, roe: null, dividendYield: null, marketCap: null };
+}
+
+export async function getExploreData(runId: number) {
+  const results = await db
+    .select({
+      code: schema.companies.screenerCode,
+      name: schema.companies.name,
+      sector: schema.companies.sector,
+      classification: schema.analysisResults.classification,
+      finalScore: schema.analysisResults.finalScore,
+      valuationScore: schema.analysisResults.valuationScore,
+      qualityScore: schema.analysisResults.qualityScore,
+      governanceScore: schema.analysisResults.governanceScore,
+      safetyScore: schema.analysisResults.safetyScore,
+      momentumScore: schema.analysisResults.momentumScore,
+      pe: schema.companySnapshots.stockPe,
+      roce: schema.companySnapshots.roce,
+      roe: schema.companySnapshots.roe,
+      piotroskiFScore: schema.analysisResults.piotroskiFScore,
+      dividendYield: schema.companySnapshots.dividendYield,
+      marketCap: schema.companySnapshots.marketCap,
+    })
+    .from(schema.analysisResults)
+    .innerJoin(schema.companies, eq(schema.analysisResults.companyId, schema.companies.id))
+    .leftJoin(
+      schema.companySnapshots,
+      and(
+        eq(schema.companySnapshots.companyId, schema.companies.id),
+        eq(schema.companySnapshots.scrapeRunId, runId),
+      ),
+    )
+    .where(eq(schema.analysisResults.scrapeRunId, runId));
+
+  return results;
+}
+
+export async function getTrendData() {
+  const results = await db
+    .select({
+      runDate: sql<string>`to_char(${schema.scrapeRuns.completedAt}, 'YYYY-MM-DD')`,
+      avgScore: sql<number>`avg(${schema.analysisHistory.finalScore}::numeric)::numeric(5,1)`,
+      strongLong: sql<number>`count(*) FILTER (WHERE ${schema.analysisHistory.classification} = 'strong_long')::int`,
+      potentialLong: sql<number>`count(*) FILTER (WHERE ${schema.analysisHistory.classification} = 'potential_long')::int`,
+      neutral: sql<number>`count(*) FILTER (WHERE ${schema.analysisHistory.classification} = 'neutral')::int`,
+      total: sql<number>`count(*)::int`,
+    })
+    .from(schema.analysisHistory)
+    .innerJoin(schema.scrapeRuns, eq(schema.analysisHistory.scrapeRunId, schema.scrapeRuns.id))
+    .groupBy(schema.analysisHistory.scrapeRunId, schema.scrapeRuns.completedAt)
+    .orderBy(schema.scrapeRuns.completedAt);
+
+  return results;
+}
+
+export async function getWhatChanged(runId: number) {
+  const results = await db
+    .select({
+      code: schema.companies.screenerCode,
+      name: schema.companies.name,
+      scoreChange: schema.analysisResults.scoreChange,
+      classificationChange: schema.analysisResults.classificationChange,
+      classification: schema.analysisResults.classification,
+      finalScore: schema.analysisResults.finalScore,
+    })
+    .from(schema.analysisResults)
+    .innerJoin(schema.companies, eq(schema.analysisResults.companyId, schema.companies.id))
+    .where(
+      and(
+        eq(schema.analysisResults.scrapeRunId, runId),
+        or(
+          sql`abs(${schema.analysisResults.scoreChange}::numeric) >= 15`,
+          sql`${schema.analysisResults.classificationChange} IS NOT NULL`,
+        ),
+      ),
+    )
+    .orderBy(desc(sql`abs(${schema.analysisResults.scoreChange}::numeric)`))
+    .limit(20);
+
+  return results;
+}
+
+export async function getMarketCommentary(runId: number): Promise<string | null> {
+  const result = await db
+    .select({ marketCommentary: schema.scrapeRuns.marketCommentary })
+    .from(schema.scrapeRuns)
+    .where(eq(schema.scrapeRuns.id, runId))
+    .limit(1);
+
+  return result[0]?.marketCommentary ?? null;
+}
+
+export async function getWatchlistCompanies(codes: string[], runId: number) {
+  if (codes.length === 0) return [];
+
+  const results = await db
+    .select({
+      ...companyColumns,
+      pe: schema.companySnapshots.stockPe,
+      roce: schema.companySnapshots.roce,
+      dividendYield: schema.companySnapshots.dividendYield,
+      marketCap: schema.companySnapshots.marketCap,
+      piotroskiFScore: schema.analysisResults.piotroskiFScore,
+      llmSynthesis: schema.analysisResults.llmSynthesis,
+    })
+    .from(schema.analysisResults)
+    .innerJoin(schema.companies, eq(schema.analysisResults.companyId, schema.companies.id))
+    .leftJoin(
+      schema.companySnapshots,
+      and(
+        eq(schema.companySnapshots.companyId, schema.companies.id),
+        eq(schema.companySnapshots.scrapeRunId, runId),
+      ),
+    )
+    .where(
+      and(
+        eq(schema.analysisResults.scrapeRunId, runId),
+        inArray(schema.companies.screenerCode, codes),
+      ),
+    )
+    .orderBy(desc(schema.analysisResults.finalScore));
+
+  return results;
 }

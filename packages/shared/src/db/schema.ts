@@ -10,6 +10,7 @@ import {
   uniqueIndex,
   index,
   date,
+  text,
 } from 'drizzle-orm/pg-core';
 
 // ── companies ──────────────────────────────────
@@ -37,6 +38,7 @@ export const scrapeRuns = pgTable('scrape_runs', {
   successful: integer('successful').default(0),
   failed: integer('failed').default(0),
   status: varchar('status', { length: 20 }).default('running'),
+  marketCommentary: text('market_commentary'),
 });
 
 // ── company_snapshots ──────────────────────────
@@ -220,3 +222,25 @@ export const macroSnapshots = pgTable(
     index('idx_macro_date').on(table.snapshotDate),
   ],
 );
+
+// ── analysis_history ──────────────────────────
+export const analysisHistory = pgTable('analysis_history', {
+  id: serial('id').primaryKey(),
+  companyId: integer('company_id').notNull().references(() => companies.id),
+  scrapeRunId: integer('scrape_run_id').notNull().references(() => scrapeRuns.id),
+  finalScore: numeric('final_score'),
+  classification: varchar('classification', { length: 20 }),
+  convictionLevel: varchar('conviction_level', { length: 10 }),
+  classificationSource: varchar('classification_source', { length: 10 }),
+  dimensionScores: jsonb('dimension_scores'),
+  frameworkScores: jsonb('framework_scores'),
+  lynchCategory: varchar('lynch_category', { length: 20 }),
+  disqualified: boolean('disqualified').default(false),
+  disqualificationReasons: jsonb('disqualification_reasons'),
+  keyMetrics: jsonb('key_metrics'),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+}, (table) => [
+  uniqueIndex('analysis_history_company_run_idx').on(table.companyId, table.scrapeRunId),
+  index('analysis_history_run_idx').on(table.scrapeRunId),
+  index('analysis_history_company_time_idx').on(table.companyId, table.createdAt),
+]);

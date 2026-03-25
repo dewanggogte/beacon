@@ -9,7 +9,7 @@ const LYNCH_CONFIG: Record<string, { label: string; color: string; bg: string }>
 
 export function LynchBadge({ category }: { category: string | null }) {
   if (!category) return null;
-  const config = LYNCH_CONFIG[category] ?? { label: category.toUpperCase(), color: 'text-text-muted', bg: 'bg-bg-secondary' };
+  const config = LYNCH_CONFIG[category] ?? { label: category.toUpperCase(), color: 'text-text-muted dark:text-dark-text-muted', bg: 'bg-bg-secondary dark:bg-dark-bg-secondary' };
   return (
     <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${config.color} ${config.bg}`}>
       {config.label}

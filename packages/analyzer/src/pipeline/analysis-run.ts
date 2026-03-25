@@ -6,8 +6,10 @@ import { scoreAllCompanies } from '../scoring/engine.js';
 import { runQualitativeAnalysis } from '../llm/qualitative-analyzer.js';
 import { runDivergenceWatcher } from '../llm/divergence-watcher.js';
 import { saveAnalysisResults } from '../storage/save-analysis.js';
+import { saveAnalysisHistory } from './save-analysis-history.js';
 import { computeWeeklyChanges } from './weekly-comparison.js';
 import { generateWeeklyReport } from '../output/report-generator.js';
+import { generateMarketCommentary } from './market-commentary.js';
 
 export interface AnalysisOptions {
   scrapeRunId?: number;
@@ -83,6 +85,10 @@ export async function runAnalysis(options: AnalysisOptions = {}): Promise<void> 
 
     logger.info('=== Saving Results ===');
     await saveAnalysisResults(scrapeRunId, analyses);
+    await saveAnalysisHistory(scrapeRunId);
+
+    logger.info('=== Market Commentary ===');
+    await generateMarketCommentary(scrapeRunId);
 
     const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
     logger.info(`LLM-only pipeline complete in ${elapsed}s — ${analyses.length} companies`);
@@ -146,6 +152,13 @@ export async function runAnalysis(options: AnalysisOptions = {}): Promise<void> 
   // Save results to DB
   logger.info('=== Saving Results ===');
   await saveAnalysisResults(scrapeRunId, analyses);
+  await saveAnalysisHistory(scrapeRunId);
+
+  // Market commentary (LLM-powered overview, skip if --skip-llm)
+  if (!options.skipLlm) {
+    logger.info('=== Market Commentary ===');
+    await generateMarketCommentary(scrapeRunId);
+  }
 
   // Weekly comparison
   logger.info('=== Weekly Comparison ===');
