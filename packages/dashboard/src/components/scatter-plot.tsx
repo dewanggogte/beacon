@@ -83,9 +83,34 @@ export function ScatterPlot({ data }: ScatterPlotProps) {
   const [yAxis, setYAxis] = useState<AxisKey>('roce');
   const router = useRouter();
 
-  const filtered = data
+  const raw = data
     .filter((d) => d[xAxis] != null && d[yAxis] != null)
     .map((d) => ({ ...d, xVal: d[xAxis] as number, yVal: d[yAxis] as number }));
+
+  // Compute 5th/95th percentile bounds to clip outliers
+  function percentile(values: number[], p: number): number {
+    const sorted = [...values].sort((a, b) => a - b);
+    const idx = Math.floor(sorted.length * p);
+    return sorted[Math.min(idx, sorted.length - 1)];
+  }
+
+  const xVals = raw.map((d) => d.xVal);
+  const yVals = raw.map((d) => d.yVal);
+  const xMin = xVals.length > 0 ? percentile(xVals, 0.02) : 0;
+  const xMax = xVals.length > 0 ? percentile(xVals, 0.95) : 100;
+  const yMin = yVals.length > 0 ? percentile(yVals, 0.02) : 0;
+  const yMax = yVals.length > 0 ? percentile(yVals, 0.95) : 100;
+
+  // Add 10% padding to the range
+  const xPad = (xMax - xMin) * 0.1 || 1;
+  const yPad = (yMax - yMin) * 0.1 || 1;
+  const xDomain: [number, number] = [Math.max(0, xMin - xPad), xMax + xPad];
+  const yDomain: [number, number] = [Math.max(0, yMin - yPad), yMax + yPad];
+
+  // Only show points within the visible domain (clip outliers from rendering)
+  const filtered = raw.filter(
+    (d) => d.xVal >= xDomain[0] && d.xVal <= xDomain[1] && d.yVal >= yDomain[0] && d.yVal <= yDomain[1]
+  );
 
   const xLabel = AXIS_OPTIONS.find((o) => o.value === xAxis)?.label ?? xAxis;
   const yLabel = AXIS_OPTIONS.find((o) => o.value === yAxis)?.label ?? yAxis;
@@ -114,7 +139,7 @@ export function ScatterPlot({ data }: ScatterPlotProps) {
         </div>
       </div>
 
-      {filtered.length < 5 ? (
+      {raw.length < 5 ? (
         <div className="h-[320px] flex items-center justify-center text-text-muted dark:text-dark-text-muted text-sm">
           Not enough data for scatter plot
         </div>
@@ -126,6 +151,8 @@ export function ScatterPlot({ data }: ScatterPlotProps) {
               dataKey="xVal"
               name={xLabel}
               type="number"
+              domain={xDomain}
+              allowDataOverflow
               label={{ value: xLabel, position: 'insideBottom', offset: -10, fontSize: 11 }}
               tick={{ fontSize: 10 }}
             />
@@ -133,6 +160,8 @@ export function ScatterPlot({ data }: ScatterPlotProps) {
               dataKey="yVal"
               name={yLabel}
               type="number"
+              domain={yDomain}
+              allowDataOverflow
               label={{ value: yLabel, angle: -90, position: 'insideLeft', offset: 10, fontSize: 11 }}
               tick={{ fontSize: 10 }}
             />

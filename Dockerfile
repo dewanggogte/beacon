@@ -68,6 +68,7 @@ COPY packages/shared/drizzle.config.ts packages/shared/drizzle.config.ts
 # Copy Next.js standalone build (mirrors monorepo structure due to outputFileTracingRoot)
 COPY --from=builder /app/packages/dashboard/.next/standalone ./
 COPY --from=builder /app/packages/dashboard/.next/static packages/dashboard/.next/static
+COPY --from=builder /app/packages/dashboard/public packages/dashboard/public
 
 # Copy pipeline scripts, principles, and config files
 COPY scripts scripts
