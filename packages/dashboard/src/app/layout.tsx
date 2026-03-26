@@ -28,6 +28,7 @@ export default function RootLayout({
           href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600&display=swap"
           rel="stylesheet"
         />
+        <script defer src="https://cloud.umami.is/script.js" data-website-id="0b1107f0-d2d1-4de6-8ddc-a26c68b4dca3" />
         <script dangerouslySetInnerHTML={{ __html: `
           (function() {
             var theme = localStorage.getItem('theme');
