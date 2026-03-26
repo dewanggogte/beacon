@@ -122,19 +122,27 @@ export default async function HomePage() {
         </div>
       )}
 
-      {/* ── 3. High Conviction Picks ──────────────────────────────── */}
+      {/* ── 3. High Conviction Picks — Top 3 spotlight ─────────────── */}
       {highConviction.length > 0 && (
         <div>
-          <h2 className="text-lg font-semibold text-text-primary dark:text-dark-text-primary mb-4">
-            High Conviction Picks
-          </h2>
-          <div className="grid md:grid-cols-2 gap-4">
-            {highConviction.slice(0, 6).map((c) => {
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold text-text-primary dark:text-dark-text-primary">
+              High Conviction Picks
+            </h2>
+            {highConviction.length > 3 && (
+              <a
+                href="/rankings?preset=high-conviction"
+                className="text-accent-cyan text-sm hover:underline"
+              >
+                All {highConviction.length} picks &rarr;
+              </a>
+            )}
+          </div>
+          <div className="space-y-3">
+            {highConviction.slice(0, 3).map((c) => {
               const synthesis = c.llmSynthesis as {
                 investment_thesis?: string;
-                conviction_reasoning?: string;
               } | null;
-              // Extract first sentence from investment_thesis for the one-line narrative
               const thesis = synthesis?.investment_thesis ?? null;
               const firstSentence = thesis
                 ? thesis.split(/(?<=[.!?])\s+/)[0] ?? thesis
@@ -143,43 +151,27 @@ export default async function HomePage() {
                 <a
                   key={c.screenerCode}
                   href={`/company/${c.screenerCode}`}
-                  className="bg-bg-card dark:bg-dark-bg-card border border-accent-green/30 rounded-lg p-6 hover:bg-bg-hover dark:hover:bg-dark-bg-hover transition-colors"
+                  className="flex items-start gap-4 bg-bg-card dark:bg-dark-bg-card border border-accent-green/20 rounded-lg px-5 py-3 hover:bg-bg-hover dark:hover:bg-dark-bg-hover transition-colors"
                 >
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="font-medium text-accent-cyan">{c.companyName}</div>
-                    <div className="text-accent-green font-bold">
-                      {Number(c.finalScore ?? 0).toFixed(0)}
+                  <div className="text-2xl font-bold text-accent-green leading-none pt-0.5">
+                    {Number(c.finalScore ?? 0).toFixed(0)}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-0.5">
+                      <span className="font-medium text-accent-cyan">{c.companyName}</span>
+                      <span className="text-text-muted dark:text-dark-text-muted text-xs">{c.sector}</span>
+                      <LynchBadge category={c.lynchClassification} />
                     </div>
+                    {firstSentence && (
+                      <div className="text-xs text-text-secondary dark:text-dark-text-secondary line-clamp-1">
+                        {firstSentence}
+                      </div>
+                    )}
                   </div>
-                  <div className="flex gap-2 mb-2">
-                    <LynchBadge category={c.lynchClassification} />
-                    <ConvictionBadge level={c.convictionLevel} />
-                  </div>
-                  <div className="text-text-muted dark:text-dark-text-muted text-xs mb-1">
-                    {c.sector}
-                  </div>
-                  <div className="flex gap-3 text-xs text-text-secondary dark:text-dark-text-secondary mb-2">
-                    <span>Buf: {c.buffettScore ? Number(c.buffettScore).toFixed(0) : '-'}</span>
-                    <span>Gra: {c.grahamScore ? Number(c.grahamScore).toFixed(0) : '-'}</span>
-                    <span>Pab: {c.pabraiRiskScore ? Number(c.pabraiRiskScore).toFixed(0) : '-'}</span>
-                  </div>
-                  {firstSentence && (
-                    <div className="text-xs text-text-secondary dark:text-dark-text-secondary line-clamp-2">
-                      {firstSentence}
-                    </div>
-                  )}
                 </a>
               );
             })}
           </div>
-          {highConviction.length > 6 && (
-            <a
-              href="/conviction"
-              className="block text-center text-accent-cyan text-sm mt-3 hover:underline"
-            >
-              View all {highConviction.length} high conviction picks &rarr;
-            </a>
-          )}
         </div>
       )}
 

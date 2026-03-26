@@ -14,11 +14,33 @@ interface SectorHeatmapProps {
 }
 
 function scoreToColor(avgScore: number): string {
-  if (avgScore >= 65) return '#3d8b5e';
-  if (avgScore >= 55) return '#5a9e72';
-  if (avgScore >= 45) return '#8b7d5e';
-  if (avgScore >= 35) return '#9e7e5a';
-  return '#9e5a5a';
+  // Continuous gradient: red (30) → amber (45) → muted olive (55) → green (70)
+  // Clamp to 30-70 range for color mapping
+  const t = Math.max(0, Math.min(1, (avgScore - 30) / 40)); // 0 at 30, 1 at 70
+
+  // Interpolate RGB: red → amber → olive → green
+  let r: number, g: number, b: number;
+  if (t < 0.33) {
+    // Red to amber
+    const p = t / 0.33;
+    r = Math.round(158 + (150 - 158) * p);
+    g = Math.round(90 + (126 - 90) * p);
+    b = Math.round(90 + (80 - 90) * p);
+  } else if (t < 0.66) {
+    // Amber to olive
+    const p = (t - 0.33) / 0.33;
+    r = Math.round(150 + (110 - 150) * p);
+    g = Math.round(126 + (140 - 126) * p);
+    b = Math.round(80 + (85 - 80) * p);
+  } else {
+    // Olive to green
+    const p = (t - 0.66) / 0.34;
+    r = Math.round(110 + (61 - 110) * p);
+    g = Math.round(140 + (139 - 140) * p);
+    b = Math.round(85 + (94 - 85) * p);
+  }
+
+  return `rgb(${r}, ${g}, ${b})`;
 }
 
 export function SectorHeatmap({ sectors, compact = false }: SectorHeatmapProps) {
