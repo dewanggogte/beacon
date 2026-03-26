@@ -1,0 +1,38 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: beacon-llm-rerun
+  namespace: beacon
+spec:
+  activeDeadlineSeconds: 108000  # 30 hours
+  backoffLimit: 1
+  template:
+    spec:
+      nodeSelector:
+        node-type: main-server
+      restartPolicy: OnFailure
+      containers:
+        - name: llm-rerun
+          image: ghcr.io/dewanggogte/beacon:latest
+          command: ["npx", "tsx", "packages/analyzer/src/index.ts", "analyze", "--llm-only", "--limit=200"]
+          envFrom:
+            - secretRef:
+                name: beacon-secrets
+          resources:
+            requests:
+              cpu: 500m
+              memory: 512Mi
+            limits:
+              cpu: "2"
+              memory: 2Gi
+          volumeMounts:
+            - name: beacon-data
+              mountPath: /app/reports
+              subPath: reports
+            - name: beacon-data
+              mountPath: /app/logs
+              subPath: logs
+      volumes:
+        - name: beacon-data
+          persistentVolumeClaim:
+            claimName: beacon-data

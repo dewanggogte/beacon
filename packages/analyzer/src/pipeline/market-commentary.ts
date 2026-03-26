@@ -2,9 +2,7 @@ import { db, schema, logger } from '@screener/shared';
 import { eq, desc, sql } from 'drizzle-orm';
 import { createLlmClient } from '../llm/create-llm-client.js';
 
-const SYSTEM_PROMPT =
-  'You are a market analyst writing brief overviews for Indian stock investors. ' +
-  'Tone: informative, measured, no hype.';
+const SYSTEM_PROMPT = `You are a senior equity research analyst writing a weekly market summary for Indian value investors. Your audience is smart but time-constrained — they skim before they read. Write in a structured, scannable format. Be direct and opinionated where the data supports it. Never hedge every sentence.`;
 
 /**
  * Generate an LLM-powered market commentary summarising the pipeline run's results.
@@ -109,26 +107,53 @@ export async function generateMarketCommentary(scrapeRunId: number): Promise<str
           .join('\n')
       : '  (no macro data available)';
 
-    const userPrompt = `You have just completed a quantitative + qualitative analysis of ${totalCompanies} listed Indian companies. Write a 3–5 paragraph market overview for value investors based on the following aggregate data.
+    const userPrompt = `You just completed a quantitative + qualitative analysis of ${totalCompanies} listed Indian companies. Write a structured market commentary using EXACTLY this format:
 
-## Classification Distribution
+## The Big Picture
+One paragraph (3-4 sentences). What does the overall classification distribution tell us? What fraction of the market looks investable vs overvalued/distressed? Is this better or worse than a healthy market would look?
+
+## Sector Spotlight
+2-3 short paragraphs. Which sectors score highest and why that matters. Which sectors are weakest. Any sector where the score diverges from market consensus (e.g., a beaten-down sector scoring well, or a popular sector scoring poorly). Name specific sectors and their scores.
+
+## Notable Moves
+One paragraph highlighting the most interesting upgrades AND downgrades from the movers list. What patterns emerge — are the moves concentrated in a sector? Are they driven by fundamental improvement or deterioration? Name 3-5 specific companies.
+
+## Macro Context
+One paragraph (skip entirely if no macro data). How current rates, inflation, and market valuation (Nifty P/E) affect the opportunity set. What regime are we in and what it means for stock selection.
+
+## Bottom Line
+2-3 sentences. The single most important takeaway for a value investor reading this today. Be direct.
+
+---
+
+DATA:
+
+Classification distribution:
 ${classDistText}
 
-## Top Sectors by Average Score
+Top sectors by average score:
 ${sectorText}
 
-## Notable Score Movers (|change| ≥ 10 points)
+Notable score movers (|change| >= 10 points):
 ${moversText}
 
-## Current Macro Environment
+Macro environment:
 ${macroText}
 
-Write the overview in plain prose, 3–5 paragraphs. Do not use bullet points or headings. Focus on what the data signals for value investors: where is opportunity concentrating, which sectors look stretched or attractive, and what macro conditions to keep in mind. Be measured and avoid hype.`;
+---
+
+RULES:
+- Use the ## headings exactly as shown above
+- Keep each section tight — no filler, no throat-clearing
+- Use specific numbers from the data (percentages, scores, company names)
+- Bold key phrases with **bold** markdown for scannability
+- If a section has no relevant data, write one sentence acknowledging that and move on
+- Total length: 400-600 words`;
 
     // ── Call LLM ─────────────────────────────────────────────────────────────
     logger.info('generateMarketCommentary: calling LLM...');
     const commentary = await client.generate(SYSTEM_PROMPT, userPrompt, {
-      maxTokens: 1024,
+      maxTokens: 2048,
       temperature: 0.5,
     });
 
