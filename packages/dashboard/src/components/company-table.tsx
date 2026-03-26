@@ -177,6 +177,33 @@ function evaluateFilter(row: CompanyRow, filter: PresetFilter | MetricFilter): b
 
 let metricFilterCounter = 0;
 
+function TableFooter({ sorted, displayLimit, totalCount, onShowMore, pageSize }: {
+  sorted: CompanyRow[]; displayLimit: number; totalCount: number; onShowMore: () => void; pageSize: number;
+}) {
+  const hasMore = sorted.length > displayLimit;
+  const isFiltered = sorted.length !== totalCount;
+  if (hasMore) {
+    return (
+      <div className="flex items-center justify-between mt-3 px-1">
+        <span className="text-xs text-text-muted dark:text-dark-text-muted">
+          Showing {displayLimit} of {sorted.length} companies
+        </span>
+        <button onClick={onShowMore} className="text-sm text-accent-cyan hover:underline">
+          Show {Math.min(pageSize, sorted.length - displayLimit)} more
+        </button>
+      </div>
+    );
+  }
+  if (sorted.length > 0 && isFiltered) {
+    return (
+      <div className="text-xs text-text-muted dark:text-dark-text-muted mt-3 px-1">
+        Showing all {sorted.length} matching companies (of {totalCount} total)
+      </div>
+    );
+  }
+  return null;
+}
+
 export function CompanyTable({ data, compact, initialPreset, initialSector }: CompanyTableProps) {
   const [search, setSearch] = useState('');
   const [sortKey, setSortKey] = useState<SortKey>('rankOverall');
@@ -193,6 +220,8 @@ export function CompanyTable({ data, compact, initialPreset, initialSector }: Co
 
   // Metric filter state
   const [metricFilters, setMetricFilters] = useState<MetricFilter[]>([]);
+  const PAGE_SIZE = 100;
+  const [displayLimit, setDisplayLimit] = useState(PAGE_SIZE);
 
   const hasFrameworks = data.some((r) => r.lynchClassification);
 
@@ -309,6 +338,9 @@ export function CompanyTable({ data, compact, initialPreset, initialSector }: Co
       return sortAsc ? (av as number) - (bv as number) : (bv as number) - (av as number);
     });
   }, [filtered, sortKey, sortAsc]);
+
+  // Reset display limit when filters/sort change
+  useEffect(() => { setDisplayLimit(PAGE_SIZE); }, [sorted.length, sortKey, sortAsc]);
 
   const handleSort = (key: SortKey) => {
     if (sortKey === key) {
@@ -562,6 +594,7 @@ export function CompanyTable({ data, compact, initialPreset, initialSector }: Co
           No companies match these filters. Try relaxing your criteria.
         </div>
       ) : (
+        <>
         <div className="overflow-x-auto border border-border dark:border-dark-border rounded-lg">
           <table className="w-full text-sm" aria-label="Company rankings" style={{ fontVariantNumeric: 'tabular-nums' }}>
             <thead className="bg-bg-secondary dark:bg-dark-bg-secondary sticky top-0 z-10">
@@ -677,7 +710,7 @@ export function CompanyTable({ data, compact, initialPreset, initialSector }: Co
               </tr>
             </thead>
             <tbody>
-              {sorted.map((row) => {
+              {sorted.slice(0, displayLimit).map((row) => {
                 const sparkData = extractSalesSparkline(row.quarterlyResults);
                 return (
                   <tr
@@ -800,6 +833,8 @@ export function CompanyTable({ data, compact, initialPreset, initialSector }: Co
             </tbody>
           </table>
         </div>
+        <TableFooter sorted={sorted} displayLimit={displayLimit} totalCount={data.length} onShowMore={() => setDisplayLimit(prev => prev + PAGE_SIZE)} pageSize={PAGE_SIZE} />
+        </>
       )}
     </div>
   );
