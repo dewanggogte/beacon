@@ -138,10 +138,12 @@ export default async function HomePage() {
           <h2 className="text-lg font-semibold text-text-primary dark:text-dark-text-primary mb-3">
             Market Overview
           </h2>
-          <div className="bg-bg-card dark:bg-dark-bg-card border border-border dark:border-dark-border rounded-lg p-6">
-            <p className="text-text-secondary dark:text-dark-text-secondary text-sm leading-relaxed">
-              {commentary}
-            </p>
+          <div className="bg-bg-card dark:bg-dark-bg-card border border-border dark:border-dark-border rounded-lg p-6 max-w-4xl">
+            <div className="text-text-secondary dark:text-dark-text-secondary text-sm leading-relaxed space-y-3">
+              {commentary.split(/\n\n+/).map((para: string, i: number) => (
+                <p key={i}>{para.trim()}</p>
+              ))}
+            </div>
           </div>
         </div>
       )}

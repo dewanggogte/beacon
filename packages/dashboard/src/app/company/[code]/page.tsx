@@ -103,7 +103,9 @@ export default async function CompanyDetailPage({
   const syn = analysis?.llmSynthesis as SynthesisData | null;
   const fund = analysis?.llmFundamentals as FundamentalsData | null;
   const rsk = analysis?.llmRisk as RiskData | null;
-  const hasLlm = !!(syn || fund || rsk || analysis?.llmGovernance);
+  // Check if LLM analysis exists — either data is present or the classification came from AG4
+  const isNonEmpty = (v: unknown) => v != null && typeof v === 'object' && Object.keys(v as object).length > 0;
+  const hasLlm = isNonEmpty(syn) || isNonEmpty(fund) || isNonEmpty(rsk) || isNonEmpty(analysis?.llmGovernance) || classSource === 'ag4';
 
   const metricDetails = analysis?.metricDetails as MetricDimension[] | null;
   const convictionReasons = analysis?.convictionReasons as string[] | null;
