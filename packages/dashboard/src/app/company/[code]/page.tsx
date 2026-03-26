@@ -1,4 +1,4 @@
-import { getCompanyDetail, getSectorMedians } from '@/lib/queries';
+import { getCompanyPageData } from '@/lib/queries';
 import { StatCard } from '@/components/stat-card';
 import { MetricStrip } from '@/components/metric-strip';
 import { FrameworkScores } from '@/components/framework-scores';
@@ -86,19 +86,15 @@ export default async function CompanyDetailPage({
   params: Promise<{ code: string }>;
 }) {
   const { code } = await params;
-  const detail = await getCompanyDetail(code);
+  const pageData = await getCompanyPageData(code);
 
-  if (!detail) return notFound();
+  if (!pageData) return notFound();
 
-  const { company, analysis, snapshot } = detail;
+  const { company, analysis, snapshot, sectorMedians: sectorMediansRaw } = pageData;
 
   // ── Derived data ──────────────────────────────────────────────────────────
 
-  const runId = analysis?.scrapeRunId ?? 0;
-  const sectorMedians =
-    company.sector && runId
-      ? await getSectorMedians(company.sector, runId)
-      : { pe: null, roce: null, roe: null, dividendYield: null, marketCap: null };
+  const sectorMedians = sectorMediansRaw ?? { pe: null, roce: null, roe: null, dividendYield: null, marketCap: null };
 
   const syn = analysis?.llmSynthesis as SynthesisData | null;
   const fund = analysis?.llmFundamentals as FundamentalsData | null;
@@ -180,13 +176,24 @@ export default async function CompanyDetailPage({
     <p className="text-sm text-text-muted dark:text-dark-text-muted">No framework data available.</p>
   );
 
-  const agentContent = hasLlm ? (
+  const hasAgentData = isNonEmpty(syn) || isNonEmpty(fund) || isNonEmpty(rsk) || isNonEmpty(analysis?.llmGovernance);
+  const agentContent = hasAgentData ? (
     <AgentAnalysisPanel
       fundamentals={analysis?.llmFundamentals}
       governance={analysis?.llmGovernance}
       risk={analysis?.llmRisk}
       synthesis={analysis?.llmSynthesis}
     />
+  ) : hasLlm ? (
+    <div className="text-sm text-text-secondary dark:text-dark-text-secondary space-y-2">
+      <p>
+        AG4 classified this company as <strong className="text-text-primary dark:text-dark-text-primary">{classification}</strong>
+        {wasOverridden && <> (overriding quant classification of <span className="text-text-muted dark:text-dark-text-muted">{quantClass}</span>)</>}.
+      </p>
+      <p className="text-text-muted dark:text-dark-text-muted text-xs">
+        Detailed agent outputs are not available for this company. This can happen when the company was classified by the LLM tier but individual agent reports were not stored.
+      </p>
+    </div>
   ) : (
     <p className="text-sm text-text-muted dark:text-dark-text-muted">
       Quant analysis only — no agent analysis available.
@@ -217,7 +224,7 @@ export default async function CompanyDetailPage({
                     <td className="py-1 text-right text-text-primary dark:text-dark-text-primary">
                       {m.rawValue !== null ? m.rawValue : '-'}
                     </td>
-                    <td className="py-1 text-right font-medium">{m.score}</td>
+                    <td className="py-1 text-right font-medium">{m.score}/100</td>
                     <td
                       className={`py-1 text-right text-xs ${
                         m.assessment === 'excellent'
@@ -356,7 +363,11 @@ export default async function CompanyDetailPage({
     },
     {
       title: 'Agent Analysis',
-      preview: hasLlm ? `4 agents · ${classSource === 'ag4' ? 'AG4 override' : 'Quant only'}` : 'Quant analysis only',
+      preview: hasAgentData
+        ? `4 agents · ${classSource === 'ag4' ? 'AG4 override' : 'Quant baseline'}`
+        : hasLlm
+        ? `AG4 classified · ${wasOverridden ? 'override applied' : 'confirmed quant'}`
+        : 'Quant analysis only',
       content: agentContent,
     },
     {
@@ -404,7 +415,7 @@ export default async function CompanyDetailPage({
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <StatCard
             label="Final Score"
-            value={finalScore.toFixed(0)}
+            value={`${finalScore.toFixed(0)}/100`}
             color={scoreColor(finalScore)}
             subtext="Geometric mean of 5 dimension scores"
           />

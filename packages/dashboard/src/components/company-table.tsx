@@ -365,6 +365,7 @@ export function CompanyTable({ data, compact, initialPreset, initialSector }: Co
     tooltip?: string;
   }) => (
     <th
+      scope="col"
       className="px-3 py-2 text-left text-xs font-medium text-text-muted dark:text-dark-text-muted uppercase tracking-wider cursor-pointer hover:text-text-primary dark:hover:text-dark-text-primary select-none whitespace-nowrap"
       onClick={() => handleSort(field)}
     >
@@ -562,7 +563,7 @@ export function CompanyTable({ data, compact, initialPreset, initialSector }: Co
         </div>
       ) : (
         <div className="overflow-x-auto border border-border dark:border-dark-border rounded-lg">
-          <table className="w-full text-sm" style={{ fontVariantNumeric: 'tabular-nums' }}>
+          <table className="w-full text-sm" aria-label="Company rankings" style={{ fontVariantNumeric: 'tabular-nums' }}>
             <thead className="bg-bg-secondary dark:bg-dark-bg-secondary sticky top-0 z-10">
               <tr>
                 <SortHeader
@@ -570,11 +571,11 @@ export function CompanyTable({ data, compact, initialPreset, initialSector }: Co
                   field="rankOverall"
                   tooltip="Rank by composite score (geometric mean of 5 dimensions)"
                 />
-                <th className="px-3 py-2 text-left text-xs font-medium text-text-muted dark:text-dark-text-muted uppercase tracking-wider">
+                <th scope="col" className="px-3 py-2 text-left text-xs font-medium text-text-muted dark:text-dark-text-muted uppercase tracking-wider">
                   Company
                 </th>
                 {!compact && (
-                  <th className="px-3 py-2 text-left text-xs font-medium text-text-muted dark:text-dark-text-muted uppercase tracking-wider whitespace-nowrap">
+                  <th scope="col" className="px-3 py-2 text-left text-xs font-medium text-text-muted dark:text-dark-text-muted uppercase tracking-wider whitespace-nowrap">
                     Revenue
                   </th>
                 )}
@@ -584,7 +585,7 @@ export function CompanyTable({ data, compact, initialPreset, initialSector }: Co
                   field="finalScore"
                   tooltip="Composite score (0-100): geometric mean of quality, valuation, governance, safety, momentum"
                 />
-                <th className="px-3 py-2 text-left text-xs font-medium text-text-muted dark:text-dark-text-muted uppercase">
+                <th scope="col" className="px-3 py-2 text-left text-xs font-medium text-text-muted dark:text-dark-text-muted uppercase">
                   Class{' '}
                   <span
                     className="text-text-muted/50 dark:text-dark-text-muted/50 cursor-help"
@@ -595,7 +596,7 @@ export function CompanyTable({ data, compact, initialPreset, initialSector }: Co
                 </th>
                 {hasFrameworks && !compact && (
                   <>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-text-muted dark:text-dark-text-muted uppercase">
+                    <th scope="col" className="px-3 py-2 text-left text-xs font-medium text-text-muted dark:text-dark-text-muted uppercase">
                       Lynch{' '}
                       <span
                         className="text-text-muted/50 dark:text-dark-text-muted/50 cursor-help"
@@ -604,7 +605,7 @@ export function CompanyTable({ data, compact, initialPreset, initialSector }: Co
                         ?
                       </span>
                     </th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-text-muted dark:text-dark-text-muted uppercase">
+                    <th scope="col" className="px-3 py-2 text-left text-xs font-medium text-text-muted dark:text-dark-text-muted uppercase">
                       Conv.{' '}
                       <span
                         className="text-text-muted/50 dark:text-dark-text-muted/50 cursor-help"
@@ -659,7 +660,7 @@ export function CompanyTable({ data, compact, initialPreset, initialSector }: Co
                     />
                   </>
                 )}
-                <th className="px-3 py-2 text-left text-xs font-medium text-text-muted dark:text-dark-text-muted uppercase">
+                <th scope="col" className="px-3 py-2 text-left text-xs font-medium text-text-muted dark:text-dark-text-muted uppercase">
                   Chg{' '}
                   <span
                     className="text-text-muted/50 dark:text-dark-text-muted/50 cursor-help"
@@ -669,7 +670,7 @@ export function CompanyTable({ data, compact, initialPreset, initialSector }: Co
                   </span>
                 </th>
                 {!compact && (
-                  <th className="px-3 py-2 text-left text-xs font-medium text-text-muted dark:text-dark-text-muted uppercase">
+                  <th scope="col" className="px-3 py-2 text-left text-xs font-medium text-text-muted dark:text-dark-text-muted uppercase">
                     Watch
                   </th>
                 )}

@@ -38,6 +38,12 @@ export default function RootLayout({
         ` }} />
       </head>
       <body className="min-h-screen antialiased bg-bg-primary dark:bg-dark-bg-primary text-text-primary dark:text-dark-text-primary">
+        <a
+          href="#main-content"
+          className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-[100] focus:px-4 focus:py-2 focus:bg-bg-card focus:text-accent-cyan focus:rounded-md focus:shadow-lg dark:focus:bg-dark-bg-card"
+        >
+          Skip to main content
+        </a>
         <ThemeProvider>
           <WatchlistProvider>
             <nav className="border-b border-border dark:border-dark-border px-8 py-4 flex items-center justify-between bg-bg-primary dark:bg-dark-bg-primary">
@@ -76,7 +82,7 @@ export default function RootLayout({
                 <MobileNav />
               </div>
             </nav>
-            <main className="p-8">{children}</main>
+            <main id="main-content" className="p-8">{children}</main>
           </WatchlistProvider>
         </ThemeProvider>
       </body>

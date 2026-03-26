@@ -36,12 +36,12 @@ export default async function PipelinePage() {
             </div>
             <div className="flex justify-between">
               <span className="text-text-muted dark:text-dark-text-muted">Started At</span>
-              <span className="text-text-primary dark:text-dark-text-primary">{new Date(status.latestRun.startedAt).toLocaleString()}</span>
+              <span className="text-text-primary dark:text-dark-text-primary">{new Date(status.latestRun.startedAt).toLocaleString('en-IN', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
             </div>
             {status.latestRun.completedAt && (
               <div className="flex justify-between">
                 <span className="text-text-muted dark:text-dark-text-muted">Completed At</span>
-                <span className="text-text-primary dark:text-dark-text-primary">{new Date(status.latestRun.completedAt).toLocaleString()}</span>
+                <span className="text-text-primary dark:text-dark-text-primary">{new Date(status.latestRun.completedAt).toLocaleString('en-IN', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
               </div>
             )}
             <div className="flex justify-between">

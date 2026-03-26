@@ -283,6 +283,16 @@ async function loadExistingAnalyses(
       frameworkResults,
       convictionLevel: (result.convictionLevel as 'high' | 'medium' | 'low' | 'none') ?? 'none',
       convictionReasons: (result.convictionReasons as string[]) ?? [],
+      // Reload prior LLM data (for --llm-only re-runs and tiering decisions)
+      llmAnalysis: (result.llmAnalysis as CompanyAnalysis['llmAnalysis']) ?? undefined,
+      llmFundamentals: (result.llmFundamentals as Record<string, unknown>) ?? undefined,
+      llmGovernance: (result.llmGovernance as Record<string, unknown>) ?? undefined,
+      llmRisk: (result.llmRisk as Record<string, unknown>) ?? undefined,
+      llmSynthesis: (result.llmSynthesis as Record<string, unknown>) ?? undefined,
+      // Reload dual evaluation attribution
+      quantClassification: (result.quantClassification as Classification) ?? undefined,
+      quantConvictionLevel: (result.quantConvictionLevel as 'high' | 'medium' | 'low' | 'none') ?? undefined,
+      classificationSource: (result.classificationSource as 'quant' | 'ag4') ?? undefined,
     });
   }
 

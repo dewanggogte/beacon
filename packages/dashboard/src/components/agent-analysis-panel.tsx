@@ -92,19 +92,52 @@ export function AgentAnalysisPanel({ fundamentals, governance, risk, synthesis }
   const hasAny = fund || gov || rsk || syn;
   if (!hasAny) return null;
 
+  const visibleTabs = tabs.filter((tab) => {
+    const data = tab === 'Synthesis' ? syn : tab === 'Fundamentals' ? fund : tab === 'Governance' ? gov : rsk;
+    return !!data;
+  });
+
+  const handleTabKeyDown = (e: React.KeyboardEvent, currentIndex: number) => {
+    let newIndex = -1;
+    if (e.key === 'ArrowRight') {
+      newIndex = (currentIndex + 1) % visibleTabs.length;
+    } else if (e.key === 'ArrowLeft') {
+      newIndex = (currentIndex - 1 + visibleTabs.length) % visibleTabs.length;
+    } else if (e.key === 'Home') {
+      newIndex = 0;
+    } else if (e.key === 'End') {
+      newIndex = visibleTabs.length - 1;
+    }
+
+    if (newIndex >= 0) {
+      e.preventDefault();
+      setActiveTab(visibleTabs[newIndex]);
+      // Focus the new tab button
+      const buttons = e.currentTarget.parentElement?.querySelectorAll('[role="tab"]');
+      (buttons?.[newIndex] as HTMLElement)?.focus();
+    }
+  };
+
   return (
     <div>
       <h2 className="text-text-muted dark:text-dark-text-muted text-xs uppercase tracking-wider mb-3">Multi-Agent LLM Analysis</h2>
       <div className="bg-bg-card dark:bg-dark-bg-card border border-border dark:border-dark-border rounded-lg overflow-hidden">
         {/* Tabs */}
-        <div className="flex border-b border-border dark:border-dark-border">
-          {tabs.map((tab) => {
+        <div role="tablist" className="flex border-b border-border dark:border-dark-border">
+          {tabs.map((tab, index) => {
             const data = tab === 'Synthesis' ? syn : tab === 'Fundamentals' ? fund : tab === 'Governance' ? gov : rsk;
             if (!data) return null;
+            const visibleIndex = visibleTabs.indexOf(tab);
             return (
               <button
                 key={tab}
+                role="tab"
+                aria-selected={activeTab === tab}
+                aria-controls={`panel-${tab.toLowerCase()}`}
+                id={`tab-${tab.toLowerCase()}`}
+                tabIndex={activeTab === tab ? 0 : -1}
                 onClick={() => setActiveTab(tab)}
+                onKeyDown={(e) => handleTabKeyDown(e, visibleIndex)}
                 className={`px-4 py-2 text-xs font-medium transition-colors ${
                   activeTab === tab
                     ? 'text-accent-cyan border-b-2 border-accent-cyan bg-bg-hover dark:bg-dark-bg-hover'
@@ -118,7 +151,12 @@ export function AgentAnalysisPanel({ fundamentals, governance, risk, synthesis }
         </div>
 
         {/* Panel Content */}
-        <div className="p-4 space-y-3">
+        <div
+          role="tabpanel"
+          id={`panel-${activeTab.toLowerCase()}`}
+          aria-labelledby={`tab-${activeTab.toLowerCase()}`}
+          className="p-4 space-y-3"
+        >
           {activeTab === 'Synthesis' && syn && (
             <>
               {syn.investment_thesis && (

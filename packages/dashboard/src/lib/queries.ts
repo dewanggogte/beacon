@@ -2,14 +2,13 @@ import { db, schema } from '@screener/shared';
 import { desc, eq, sql, and, isNull, or, inArray } from 'drizzle-orm';
 
 export async function getLatestRunId(): Promise<number | null> {
-  // Find the latest scrape run that has analysis results
   const runs = await db
-    .select({ scrapeRunId: schema.analysisResults.scrapeRunId })
-    .from(schema.analysisResults)
-    .groupBy(schema.analysisResults.scrapeRunId)
-    .orderBy(desc(schema.analysisResults.scrapeRunId))
+    .select({ id: schema.scrapeRuns.id })
+    .from(schema.scrapeRuns)
+    .where(eq(schema.scrapeRuns.status, 'completed'))
+    .orderBy(desc(schema.scrapeRuns.id))
     .limit(1);
-  return runs[0]?.scrapeRunId ?? null;
+  return runs[0]?.id ?? null;
 }
 
 export async function getRunDate(runId: number): Promise<Date | null> {
@@ -140,26 +139,26 @@ export async function getCompanyDetail(screenerCode: string) {
 
   const companyId = company[0]!.id;
 
-  // Get latest analysis
-  const analysis = await db
-    .select()
-    .from(schema.analysisResults)
-    .where(eq(schema.analysisResults.companyId, companyId))
-    .orderBy(desc(schema.analysisResults.analyzedAt))
-    .limit(1);
-
-  // Get latest snapshot
-  const snapshot = await db
-    .select()
-    .from(schema.companySnapshots)
-    .where(eq(schema.companySnapshots.companyId, companyId))
-    .orderBy(desc(schema.companySnapshots.scrapedAt))
-    .limit(1);
+  // Fetch analysis and snapshot in parallel
+  const [analysisRows, snapshotRows] = await Promise.all([
+    db
+      .select()
+      .from(schema.analysisResults)
+      .where(eq(schema.analysisResults.companyId, companyId))
+      .orderBy(desc(schema.analysisResults.analyzedAt))
+      .limit(1),
+    db
+      .select()
+      .from(schema.companySnapshots)
+      .where(eq(schema.companySnapshots.companyId, companyId))
+      .orderBy(desc(schema.companySnapshots.scrapedAt))
+      .limit(1),
+  ]);
 
   return {
     company: company[0]!,
-    analysis: analysis[0] ?? null,
-    snapshot: snapshot[0] ?? null,
+    analysis: analysisRows[0] ?? null,
+    snapshot: snapshotRows[0] ?? null,
   };
 }
 
@@ -275,7 +274,12 @@ export async function getPipelineStatus() {
   };
 }
 
+const sectorMedianCache = new Map<string, { pe: number | null; roce: number | null; roe: number | null; dividendYield: number | null; marketCap: number | null }>();
+
 export async function getSectorMedians(sector: string, runId: number) {
+  const key = `${sector}-${runId}`;
+  if (sectorMedianCache.has(key)) return sectorMedianCache.get(key)!;
+
   const results = await db
     .select({
       pe: sql<number | null>`percentile_cont(0.5) WITHIN GROUP (ORDER BY ${schema.companySnapshots.stockPe}::numeric)`,
@@ -293,7 +297,25 @@ export async function getSectorMedians(sector: string, runId: number) {
       ),
     );
 
-  return results[0] ?? { pe: null, roce: null, roe: null, dividendYield: null, marketCap: null };
+  const result = results[0] ?? { pe: null, roce: null, roe: null, dividendYield: null, marketCap: null };
+  sectorMedianCache.set(key, result);
+  return result;
+}
+
+export async function getCompanyPageData(screenerCode: string) {
+  const detail = await getCompanyDetail(screenerCode);
+  if (!detail) return null;
+
+  const { company, analysis, snapshot } = detail;
+  const runId = analysis?.scrapeRunId;
+
+  // Fetch sector medians in parallel with the already-resolved detail
+  const sectorMedians =
+    company.sector && runId
+      ? await getSectorMedians(company.sector, runId)
+      : null;
+
+  return { company, analysis, snapshot, sectorMedians };
 }
 
 export async function getExploreData(runId: number) {

@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { DarkModeToggle } from './dark-mode-toggle.js';
 
 const NAV_LINKS = [
@@ -17,6 +17,39 @@ const NAV_LINKS = [
 export function MobileNav() {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+
+    const panel = panelRef.current;
+    if (!panel) return;
+
+    // Focus first link
+    const firstLink = panel.querySelector('a, button') as HTMLElement;
+    firstLink?.focus();
+
+    // Trap focus
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { setOpen(false); return; }
+      if (e.key !== 'Tab') return;
+
+      const focusable = panel.querySelectorAll('a, button, input, [tabindex]');
+      const first = focusable[0] as HTMLElement;
+      const last = focusable[focusable.length - 1] as HTMLElement;
+
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [open]);
 
   return (
     <div className="md:hidden">
@@ -55,6 +88,8 @@ export function MobileNav() {
 
       {/* Slide-out panel */}
       <div
+        ref={panelRef}
+        onKeyDown={(e) => { if (e.key === 'Escape') setOpen(false); }}
         className={`fixed right-0 top-0 z-50 flex h-full w-64 flex-col bg-bg-card dark:bg-dark-bg-card border-l border-border dark:border-dark-border shadow-xl transition-transform duration-300 ease-in-out ${
           open ? 'translate-x-0' : 'translate-x-full'
         }`}

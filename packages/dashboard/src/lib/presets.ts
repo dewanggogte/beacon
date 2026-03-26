@@ -15,11 +15,10 @@ export const presets: Preset[] = [
   {
     id: 'value-picks',
     name: 'Value Picks',
-    description: 'Low P/E + high ROCE + low debt',
+    description: 'Low P/E + high ROCE',
     filters: [
       { metric: 'pe', operator: '<', value: 20 },
       { metric: 'roce', operator: '>', value: 15 },
-      { metric: 'de', operator: '<', value: 0.5 },
     ],
   },
   {
@@ -34,10 +33,10 @@ export const presets: Preset[] = [
   {
     id: 'low-debt-growth',
     name: 'Low Debt Growth',
-    description: 'Low leverage + not disqualified',
+    description: 'Not disqualified + strong Piotroski',
     filters: [
-      { metric: 'de', operator: '<', value: 0.5 },
       { metric: 'disqualified', operator: '=', value: 'false' },
+      { metric: 'piotroski', operator: '>=', value: 6 },
     ],
   },
   {

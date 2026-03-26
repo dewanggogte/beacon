@@ -50,16 +50,16 @@ const stages = [
   { icon: PresentIcon, name: 'Present', color: 'text-accent-green' },
 ];
 
-const funnelSteps = [
-  { label: '~5,300 scraped from Screener.in', width: '100%' },
-  { label: '~3,500 scored (Layer 1 quantitative)', width: '66%' },
-  { label: 'Top 600 enter LLM pipeline', width: '40%' },
-  { label: '~200 full AG1-AG4 analysis', width: '22%' },
-  { label: 'High conviction picks', width: '10%' },
-];
-
 export default async function OverviewPage() {
   const pipeline = await getPipelineStatus();
+
+  const funnelSteps = [
+    { label: `${pipeline.totalCompanies.toLocaleString('en-IN')} companies scraped from Screener.in`, width: '100%' },
+    { label: `${pipeline.analyzedCompanies.toLocaleString('en-IN')} scored & analyzed (Layer 1 quantitative)`, width: '66%' },
+    { label: 'Top companies enter LLM pipeline', width: '40%' },
+    { label: 'Full AG1–AG4 analysis', width: '22%' },
+    { label: 'High conviction picks', width: '10%' },
+  ];
 
   const lastRun = pipeline.latestRun;
   const statusColor = lastRun?.status === 'completed'
@@ -183,7 +183,7 @@ export default async function OverviewPage() {
               <div>
                 <span className="text-text-muted dark:text-dark-text-muted">Started:</span>{' '}
                 <span className="text-text-primary dark:text-dark-text-primary">
-                  {lastRun.startedAt ? new Date(lastRun.startedAt).toLocaleString() : '-'}
+                  {lastRun.startedAt ? new Date(lastRun.startedAt).toLocaleString('en-IN', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-'}
                 </span>
               </div>
               <div>

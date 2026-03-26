@@ -11,6 +11,7 @@ import {
 import { LynchBadge } from '@/components/lynch-badge';
 import { ConvictionBadge } from '@/components/conviction-badge';
 import { SectorHeatmap } from '@/components/sector-heatmap';
+import { AutoRefresh } from '@/components/auto-refresh';
 
 export const dynamic = 'force-dynamic';
 
@@ -68,6 +69,7 @@ export default async function HomePage() {
   return (
     <div className="space-y-10">
       {/* ── 0. Pipeline Status Banner ──────────────────────────────── */}
+      {isRunning && <AutoRefresh intervalMs={30000} />}
       {isRunning && runStarted && (
         <div className="flex items-center gap-3 bg-accent-amber/10 border border-accent-amber/30 rounded-lg px-4 py-3 text-sm">
           <span className="relative flex h-2.5 w-2.5">

@@ -59,4 +59,13 @@ export interface CompanyAnalysis {
   altmanZScore?: number | null;
   beneishMScore?: number | null;
   gateResults?: Array<{ gate: string; passed: boolean; value: number | null; threshold: string }>;
+
+  // Per-agent LLM output (written to separate DB columns for dashboard)
+  llmFundamentals?: Record<string, unknown>;
+  llmGovernance?: Record<string, unknown>;
+  llmRisk?: Record<string, unknown>;
+  llmSynthesis?: Record<string, unknown>;
+
+  // Parse failure tracking
+  llmParseFailures?: Array<{ agent: string; error: string; timestamp: string }>;
 }

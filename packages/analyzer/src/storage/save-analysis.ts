@@ -29,8 +29,14 @@ export async function saveAnalysisResults(
       disqualified: analysis.disqualified,
       disqualificationReasons: analysis.disqualificationReasons,
       metricDetails: analysis.dimensionScores,
-      llmAnalysis: analysis.llmAnalysis ?? null,
+      llmAnalysis: analysis.llmParseFailures?.length
+        ? { ...(analysis.llmAnalysis ?? {}), parseFailures: analysis.llmParseFailures }
+        : analysis.llmAnalysis ?? null,
       llmAdjustment: analysis.llmAnalysis?.qualitativeAdjustment?.toString() ?? null,
+      llmFundamentals: analysis.llmFundamentals ?? null,
+      llmGovernance: analysis.llmGovernance ?? null,
+      llmRisk: analysis.llmRisk ?? null,
+      llmSynthesis: analysis.llmSynthesis ?? null,
       finalScore: analysis.finalScore.toString(),
       classification: analysis.classification,
       rankOverall: analysis.rank,
@@ -93,6 +99,10 @@ export async function saveAnalysisResults(
           // LLM fields: only overwrite if new values are non-null (preserve existing LLM data)
           ...(values.llmAnalysis != null ? { llmAnalysis: values.llmAnalysis } : {}),
           ...(values.llmAdjustment != null ? { llmAdjustment: values.llmAdjustment } : {}),
+          ...(values.llmFundamentals != null ? { llmFundamentals: values.llmFundamentals } : {}),
+          ...(values.llmGovernance != null ? { llmGovernance: values.llmGovernance } : {}),
+          ...(values.llmRisk != null ? { llmRisk: values.llmRisk } : {}),
+          ...(values.llmSynthesis != null ? { llmSynthesis: values.llmSynthesis } : {}),
           ...(values.classificationSource !== 'quant' ? { classificationSource: values.classificationSource } : {}),
         },
       });

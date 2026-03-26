@@ -84,12 +84,21 @@ export async function runQualitativeAnalysis(
     logger.info(`Multi-agent LLM (targeted): ${tier1.length} companies → full AG1-AG4`);
   } else {
     // Normal funnel tiering
+    let priorAg4Count = 0;
     for (const a of analyses) {
-      if (a.rank <= tier1Count) {
+      // Companies that previously received AG4 evaluation auto-qualify for Tier 1
+      // (preserves LLM continuity across re-runs)
+      if (a.classificationSource === 'ag4') {
+        tier1.push(a);
+        priorAg4Count++;
+      } else if (a.rank <= tier1Count) {
         tier1.push(a);
       } else if (a.rank <= tier1Count + tier2Count) {
         tier2.push(a);
       }
+    }
+    if (priorAg4Count > 0) {
+      logger.info(`  ${priorAg4Count} companies auto-promoted to Tier 1 (prior AG4 evaluation)`);
     }
     logger.info(`Multi-agent LLM v2.2: ${tier1.length} Tier 1 (direct AG1-4), ${tier2.length} Tier 2 (AG1 funnel → promote top ${tier2PromoteCount}), ${total - tier1.length - tier2.length} Layer 1 only`);
   }
@@ -154,11 +163,16 @@ export async function runQualitativeAnalysis(
           reasoning: validated.reasoning as string,
         };
 
+        // Populate per-agent column (AG1 only for Tier 2)
+        analysis.llmFundamentals = validated as unknown as Record<string, unknown>;
+
         // Cache for potential promotion
         tier2Ag1Results.set(analysis.companyId, { parsed: validated, rawResponse: response });
         completed++;
       } else {
         parseFailures++;
+        if (!analysis.llmParseFailures) analysis.llmParseFailures = [];
+        analysis.llmParseFailures.push({ agent: 'AG1', error: 'parse_failure', timestamp: new Date().toISOString() });
         logger.warn(`AG1 parse failure for ${analysis.screenerCode}`);
       }
 
@@ -327,10 +341,32 @@ export async function runQualitativeAnalysis(
           reasoning: synthParsed.conviction_reasoning,
         };
 
+        // Populate per-agent columns for dashboard
+        if (fundParsed) analysis.llmFundamentals = fundParsed as unknown as Record<string, unknown>;
+        if (govParsed) analysis.llmGovernance = govParsed as unknown as Record<string, unknown>;
+        if (riskParsed) analysis.llmRisk = riskParsed as unknown as Record<string, unknown>;
+        analysis.llmSynthesis = synthParsed as unknown as Record<string, unknown>;
+
         completed++;
       } else {
         parseFailures++;
+        if (!analysis.llmParseFailures) analysis.llmParseFailures = [];
+        analysis.llmParseFailures.push({ agent: 'AG4', error: 'parse_failure', timestamp: new Date().toISOString() });
         logger.warn(`AG4 parse failure for ${analysis.screenerCode}`);
+      }
+
+      // Track individual agent parse failures (AG1-AG3)
+      if (!fundParsed) {
+        if (!analysis.llmParseFailures) analysis.llmParseFailures = [];
+        analysis.llmParseFailures.push({ agent: 'AG1', error: 'parse_failure', timestamp: new Date().toISOString() });
+      }
+      if (!govParsed) {
+        if (!analysis.llmParseFailures) analysis.llmParseFailures = [];
+        analysis.llmParseFailures.push({ agent: 'AG2', error: 'parse_failure', timestamp: new Date().toISOString() });
+      }
+      if (!riskParsed) {
+        if (!analysis.llmParseFailures) analysis.llmParseFailures = [];
+        analysis.llmParseFailures.push({ agent: 'AG3', error: 'parse_failure', timestamp: new Date().toISOString() });
       }
 
       const companyElapsed = ((Date.now() - companyStart) / 1000).toFixed(1);
@@ -436,10 +472,28 @@ export async function runQualitativeAnalysis(
           reasoning: synthParsed.conviction_reasoning,
         };
 
+        // Populate per-agent columns for dashboard
+        analysis.llmFundamentals = fundParsed as unknown as Record<string, unknown>;
+        if (govParsed) analysis.llmGovernance = govParsed as unknown as Record<string, unknown>;
+        if (riskParsed) analysis.llmRisk = riskParsed as unknown as Record<string, unknown>;
+        analysis.llmSynthesis = synthParsed as unknown as Record<string, unknown>;
+
         completed++;
       } else {
         parseFailures++;
+        if (!analysis.llmParseFailures) analysis.llmParseFailures = [];
+        analysis.llmParseFailures.push({ agent: 'AG4', error: 'parse_failure', timestamp: new Date().toISOString() });
         logger.warn(`AG4 parse failure for ${analysis.screenerCode}`);
+      }
+
+      // Track individual agent parse failures (AG2-AG3)
+      if (!govParsed) {
+        if (!analysis.llmParseFailures) analysis.llmParseFailures = [];
+        analysis.llmParseFailures.push({ agent: 'AG2', error: 'parse_failure', timestamp: new Date().toISOString() });
+      }
+      if (!riskParsed) {
+        if (!analysis.llmParseFailures) analysis.llmParseFailures = [];
+        analysis.llmParseFailures.push({ agent: 'AG3', error: 'parse_failure', timestamp: new Date().toISOString() });
       }
 
       const companyElapsed = ((Date.now() - companyStart) / 1000).toFixed(1);

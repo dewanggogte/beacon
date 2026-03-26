@@ -247,25 +247,31 @@ export default function WatchlistPage() {
     }
 
     let cancelled = false;
-    setLoading(true);
 
-    fetch('/api/watchlist', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ codes: watchlist }),
-    })
-      .then((r) => r.json())
-      .then((data: WatchlistCompany[]) => {
-        if (!cancelled) {
-          setCompanies(data);
-          setLoading(false);
-        }
+    const timer = setTimeout(() => {
+      setLoading(true);
+
+      fetch('/api/watchlist', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ codes: watchlist }),
       })
-      .catch(() => {
-        if (!cancelled) setLoading(false);
-      });
+        .then((r) => r.json())
+        .then((data: WatchlistCompany[]) => {
+          if (!cancelled) {
+            setCompanies(data);
+            setLoading(false);
+          }
+        })
+        .catch(() => {
+          if (!cancelled) setLoading(false);
+        });
+    }, 300);
 
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
   }, [watchlist]);
 
   // ── Empty state ──────────────────────────────────────────────────────────
@@ -351,7 +357,7 @@ export default function WatchlistPage() {
 
       {/* Comparison table */}
       <div className={needsScroll ? 'overflow-x-auto' : ''}>
-        <table className="w-full border-collapse text-sm" style={needsScroll ? { minWidth: `${allColumns.length * 180 + 180}px` } : {}}>
+        <table className="w-full border-collapse text-sm" aria-label="Watchlist comparison" style={needsScroll ? { minWidth: `${allColumns.length * 180 + 180}px` } : {}}>
           <colgroup>
             {/* Metric label column */}
             <col style={{ width: '180px', minWidth: '140px' }} />
