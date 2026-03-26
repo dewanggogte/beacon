@@ -6,6 +6,7 @@ import {
   getMarketCommentary,
   getWhatChanged,
   getRunDate,
+  getPipelineStatus,
 } from '@/lib/queries';
 import { LynchBadge } from '@/components/lynch-badge';
 import { ConvictionBadge } from '@/components/conviction-badge';
@@ -26,14 +27,20 @@ export default async function HomePage() {
     );
   }
 
-  const [stats, commentary, conviction, sectorData, whatChanged, runDate] = await Promise.all([
+  const [stats, commentary, conviction, sectorData, whatChanged, runDate, pipelineStatus] = await Promise.all([
     getSummaryStats(runId),
     getMarketCommentary(runId),
     getHighConvictionCompanies(runId),
     getSectorDistribution(runId),
     getWhatChanged(runId),
     getRunDate(runId),
+    getPipelineStatus(),
   ]);
+
+  const isRunning = pipelineStatus.latestRun?.status === 'running';
+  const runStarted = pipelineStatus.latestRun?.startedAt
+    ? new Date(pipelineStatus.latestRun.startedAt)
+    : null;
 
   const highConviction = conviction.filter((c) => c.convictionLevel === 'high');
 
@@ -60,6 +67,23 @@ export default async function HomePage() {
 
   return (
     <div className="space-y-10">
+      {/* ── 0. Pipeline Status Banner ──────────────────────────────── */}
+      {isRunning && runStarted && (
+        <div className="flex items-center gap-3 bg-accent-amber/10 border border-accent-amber/30 rounded-lg px-4 py-3 text-sm">
+          <span className="relative flex h-2.5 w-2.5">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-accent-amber opacity-75" />
+            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-accent-amber" />
+          </span>
+          <span className="text-text-primary dark:text-dark-text-primary">
+            Pipeline is running
+          </span>
+          <span className="text-text-muted dark:text-dark-text-muted">
+            — started {runStarted.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+            {pipelineStatus.analyzedCompanies > 0 && ` · ${pipelineStatus.analyzedCompanies.toLocaleString()} of ${pipelineStatus.totalCompanies.toLocaleString()} analyzed`}
+          </span>
+        </div>
+      )}
+
       {/* ── 1. Hero Zone ─────────────────────────────────────────── */}
       <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6 pb-8 border-b border-border dark:border-dark-border">
         <div className="lg:w-3/5">
