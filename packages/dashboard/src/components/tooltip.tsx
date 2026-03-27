@@ -9,20 +9,25 @@ interface TooltipProps {
 
 export function Tooltip({ content, children }: TooltipProps) {
   const [show, setShow] = useState(false);
-  const [position, setPosition] = useState<'top' | 'bottom'>('top');
+  const [coords, setCoords] = useState({ top: 0, left: 0, above: true });
   const triggerRef = useRef<HTMLSpanElement>(null);
 
   useEffect(() => {
     if (show && triggerRef.current) {
       const rect = triggerRef.current.getBoundingClientRect();
-      setPosition(rect.top < 120 ? 'bottom' : 'top');
+      const above = rect.top > 140;
+      setCoords({
+        top: above ? rect.top - 8 : rect.bottom + 8,
+        left: Math.max(140, Math.min(rect.left + rect.width / 2, window.innerWidth - 140)),
+        above,
+      });
     }
   }, [show]);
 
   return (
     <span
       ref={triggerRef}
-      className="relative inline-flex items-center"
+      className="inline-flex items-center"
       onMouseEnter={() => setShow(true)}
       onMouseLeave={() => setShow(false)}
       onClick={() => setShow(!show)}
@@ -30,11 +35,13 @@ export function Tooltip({ content, children }: TooltipProps) {
       {children}
       {show && (
         <span
-          className={`absolute z-50 w-64 p-3 text-xs leading-relaxed rounded-lg shadow-lg border
-            bg-bg-card dark:bg-dark-bg-card text-text-primary dark:text-dark-text-primary
-            border-border dark:border-dark-border
-            ${position === 'top' ? 'bottom-full mb-2' : 'top-full mt-2'}
-            left-1/2 -translate-x-1/2`}
+          className="fixed z-[100] w-64 p-3 text-xs leading-relaxed rounded-lg shadow-lg border bg-bg-card dark:bg-dark-bg-card text-text-primary dark:text-dark-text-primary border-border dark:border-dark-border"
+          style={{
+            top: coords.above ? undefined : coords.top,
+            bottom: coords.above ? `calc(100vh - ${coords.top}px)` : undefined,
+            left: coords.left,
+            transform: 'translateX(-50%)',
+          }}
         >
           {content}
         </span>

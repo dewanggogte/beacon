@@ -66,6 +66,44 @@ export default async function HomePage() {
       avgScore: Number(s.avgScore),
     }));
 
+  // Render markdown-lite commentary (## headings, **bold**, paragraphs)
+  function renderCommentary(text: string) {
+    const lines = text.split(/\n/).map((l: string) => l.trim()).filter((l: string) => l && l !== '---');
+    const elements: React.ReactNode[] = [];
+    let paragraphLines: string[] = [];
+
+    const flushParagraph = () => {
+      if (paragraphLines.length === 0) return;
+      const joined = paragraphLines.join(' ');
+      const parts = joined.split(/(\*\*[^*]+\*\*)/g);
+      elements.push(
+        <p key={elements.length}>
+          {parts.map((part: string, j: number) =>
+            part.startsWith('**') && part.endsWith('**')
+              ? <strong key={j} className="text-text-primary dark:text-dark-text-primary font-medium">{part.slice(2, -2)}</strong>
+              : part
+          )}
+        </p>
+      );
+      paragraphLines = [];
+    };
+
+    for (const line of lines) {
+      if (line.startsWith('## ')) {
+        flushParagraph();
+        elements.push(
+          <h3 key={elements.length} className="text-base font-semibold text-text-primary dark:text-dark-text-primary mt-3 first:mt-0">
+            {line.replace(/^## /, '')}
+          </h3>
+        );
+      } else {
+        paragraphLines.push(line);
+      }
+    }
+    flushParagraph();
+    return elements;
+  }
+
   return (
     <div className="space-y-10">
       {/* ── 0. Pipeline Status Banner ──────────────────────────────── */}
@@ -142,29 +180,7 @@ export default async function HomePage() {
           </h2>
           <div className="bg-bg-card dark:bg-dark-bg-card border border-border dark:border-dark-border rounded-lg p-6 max-w-4xl">
             <div className="text-text-secondary dark:text-dark-text-secondary text-sm leading-relaxed space-y-4">
-              {commentary.split(/\n\n+/).map((block: string, i: number) => {
-                const trimmed = block.trim();
-                if (!trimmed || trimmed === '---') return null;
-                // Render ## headings
-                if (trimmed.startsWith('## ')) {
-                  return (
-                    <h3 key={i} className="text-base font-semibold text-text-primary dark:text-dark-text-primary mt-2 first:mt-0">
-                      {trimmed.replace(/^## /, '')}
-                    </h3>
-                  );
-                }
-                // Render paragraphs with **bold** support
-                const parts = trimmed.split(/(\*\*[^*]+\*\*)/g);
-                return (
-                  <p key={i}>
-                    {parts.map((part: string, j: number) =>
-                      part.startsWith('**') && part.endsWith('**')
-                        ? <strong key={j} className="text-text-primary dark:text-dark-text-primary font-medium">{part.slice(2, -2)}</strong>
-                        : part
-                    )}
-                  </p>
-                );
-              })}
+              {renderCommentary(commentary)}
             </div>
           </div>
         </div>

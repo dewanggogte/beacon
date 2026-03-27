@@ -118,9 +118,12 @@ export default async function CompanyDetailPage({
 
   // ── Catalysts & Risks sources ─────────────────────────────────────────────
 
+  // Positive signals = catalysts; monitor items = watch list (separate from catalysts)
   const llmCatalysts: string[] = [];
-  if (syn?.key_monitor_items) llmCatalysts.push(...syn.key_monitor_items);
   if (fund?.positive_signals) llmCatalysts.push(...fund.positive_signals);
+
+  const llmMonitorItems: string[] = [];
+  if (syn?.key_monitor_items) llmMonitorItems.push(...syn.key_monitor_items);
 
   const llmRisks: string[] = [];
   if (rsk?.primary_risks) {
@@ -130,18 +133,12 @@ export default async function CompanyDetailPage({
   }
   if (rsk?.tail_risk) llmRisks.push(`Tail risk: ${rsk.tail_risk}`);
 
-  const catalysts: string[] = hasLlm
-    ? llmCatalysts
-    : (pros ?? []);
-  const risks: string[] = hasLlm
-    ? llmRisks
-    : (cons ?? []);
-
   // Fallback to snapshot pros/cons when LLM arrays are empty
   const displayCatalysts =
-    catalysts.length > 0 ? catalysts : (pros ?? []);
+    (hasLlm && llmCatalysts.length > 0) ? llmCatalysts : (pros ?? []);
   const displayRisks =
-    risks.length > 0 ? risks : (cons ?? []);
+    (hasLlm && llmRisks.length > 0) ? llmRisks : (cons ?? []);
+  const displayMonitorItems = llmMonitorItems;
 
   // ── Framework preview string ──────────────────────────────────────────────
   const frameworkPreview = [
@@ -596,6 +593,23 @@ export default async function CompanyDetailPage({
             )}
           </div>
         </div>
+
+        {/* Monitor Items — things to watch, separate from catalysts */}
+        {displayMonitorItems.length > 0 && (
+          <div className="bg-bg-card dark:bg-dark-bg-card border border-accent-amber/30 rounded-lg p-4 mt-4">
+            <h3 className="text-accent-amber text-xs font-semibold uppercase tracking-wider mb-3">
+              Key Items to Monitor
+            </h3>
+            <ul className="space-y-1.5">
+              {displayMonitorItems.map((item, i) => (
+                <li key={i} className="text-sm text-text-secondary dark:text-dark-text-secondary flex gap-2">
+                  <span className="text-accent-amber/60 mt-0.5 shrink-0">→</span>
+                  <span>{item}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </div>
 
       {/* ── 6. Progressive Detail Sections ───────────────────────────────── */}
