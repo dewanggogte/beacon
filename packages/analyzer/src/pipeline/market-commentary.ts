@@ -74,8 +74,11 @@ export async function generateMarketCommentary(scrapeRunId: number): Promise<str
     // ── Build user prompt ────────────────────────────────────────────────────
     const totalCompanies = classificationDist.reduce((sum, r) => sum + r.count, 0);
 
+    const humanLabel = (cls: string | null) =>
+      (cls ?? 'unknown').replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+
     const classDistText = classificationDist
-      .map((r) => `  ${r.classification ?? 'unknown'}: ${r.count}`)
+      .map((r) => `  ${humanLabel(r.classification)}: ${r.count}`)
       .join('\n');
 
     const sectorText = sectorAverages
@@ -86,7 +89,7 @@ export async function generateMarketCommentary(scrapeRunId: number): Promise<str
       ? notableMovers
           .map((r) => {
             const dir = Number(r.scoreChange ?? 0) > 0 ? '+' : '';
-            return `  ${r.companyName} (${r.sector ?? 'Unknown'}) — score ${r.finalScore}, change ${dir}${r.scoreChange}, now: ${r.classification}`;
+            return `  ${r.companyName} (${r.sector ?? 'Unknown'}) — score ${r.finalScore}, change ${dir}${r.scoreChange}, now: ${humanLabel(r.classification)}`;
           })
           .join('\n')
       : '  (no significant movers this week)';
@@ -148,7 +151,8 @@ RULES:
 - Use specific numbers from the data (percentages, scores, company names)
 - Bold key phrases with **bold** markdown for scannability
 - If a section has no relevant data, write one sentence acknowledging that and move on
-- Total length: 400-600 words`;
+- Total length: 400-600 words
+- IMPORTANT: Never use internal classification codes like "strong_avoid", "potential_long", "strong_long" etc. Translate them to natural language: "Strong Avoid" → "classified as a strong avoid", "Potential Long" → "identified as a potential long candidate", "Strong Long" → "rated as a strong long-term pick". Write for an investor who has never seen the codebase.`;
 
     // ── Call LLM ─────────────────────────────────────────────────────────────
     logger.info('generateMarketCommentary: calling LLM...');

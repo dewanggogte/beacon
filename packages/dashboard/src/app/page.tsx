@@ -43,7 +43,10 @@ export default async function HomePage() {
     ? new Date(pipelineStatus.latestRun.startedAt)
     : null;
 
-  const highConviction = conviction.filter((c) => c.convictionLevel === 'high');
+  const highConviction = conviction.filter((c) =>
+    c.convictionLevel === 'high' &&
+    (c.classification === 'strong_long' || c.classification === 'potential_long')
+  );
 
   // Compute upgrade/downgrade counts from whatChanged
   const upgrades = whatChanged.filter(
@@ -68,7 +71,16 @@ export default async function HomePage() {
 
   // Render markdown-lite commentary (## headings, **bold**, paragraphs)
   function renderCommentary(text: string) {
-    const lines = text.split(/\n/).map((l: string) => l.trim()).filter((l: string) => l && l !== '---');
+    // Clean up internal classification codes for display
+    const cleaned = text
+      .replace(/\bstrong_avoid\b/gi, 'Strong Avoid')
+      .replace(/\bpotential_long\b/gi, 'Potential Long')
+      .replace(/\bstrong_long\b/gi, 'Strong Long')
+      .replace(/\bpotential_short\b/gi, 'Potential Short')
+      .replace(/\bfast_grower\b/gi, 'Fast Grower')
+      .replace(/\bslow_grower\b/gi, 'Slow Grower')
+      .replace(/\basset_play\b/gi, 'Asset Play');
+    const lines = cleaned.split(/\n/).map((l: string) => l.trim()).filter((l: string) => l && l !== '---');
     const elements: React.ReactNode[] = [];
     let paragraphLines: string[] = [];
 
