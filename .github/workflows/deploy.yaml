@@ -54,10 +54,10 @@ jobs:
 
           # Then trigger a resource action to restart the deployment
           curl -sf -X POST \
-            "https://${ARGOCD_SERVER}/api/v1/applications/${ARGOCD_APP}/resource/actions" \
+            "https://${ARGOCD_SERVER}/api/v1/applications/${ARGOCD_APP}/resource/actions?namespace=beacon&resourceName=beacon&version=v1&kind=Deployment&group=apps" \
             -H "Authorization: Bearer ${ARGOCD_AUTH_TOKEN}" \
             -H "Content-Type: application/json" \
-            -d "{\"namespace\":\"beacon\",\"resourceName\":\"beacon\",\"version\":\"v1\",\"kind\":\"Deployment\",\"group\":\"apps\",\"action\":\"restart\"}" \
+            -d '"restart"' \
             --max-time 30 \
             --retry 3 \
             --retry-delay 10
