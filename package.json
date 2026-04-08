@@ -21,6 +21,7 @@
     "pipeline:scrape": "npx tsx scripts/run-pipeline.ts --scrape-only",
     "pipeline:analyze": "npx tsx scripts/run-pipeline.ts --analyze-only",
     "pipeline:quick": "npx tsx scripts/run-pipeline.ts --skip-llm",
+    "sync:neon": "npx tsx scripts/sync-to-neon.ts",
     "db:generate": "npm run db:generate -w @screener/shared",
     "db:migrate": "npm run db:migrate -w @screener/shared",
     "db:studio": "npm run db:studio -w @screener/shared"

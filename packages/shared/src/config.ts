@@ -6,6 +6,7 @@ const emptyToUndef = (v: unknown) => (v === '' ? undefined : v);
 
 const envSchema = z.object({
   DATABASE_URL: z.string().default('postgres://localhost:5432/screener'),
+  NEON_DATABASE_URL: z.preprocess(emptyToUndef, z.string().optional()),
   ANTHROPIC_API_KEY: z.preprocess(emptyToUndef, z.string().optional()),
   SCREENER_BASE_URL: z.string().default('https://www.screener.in'),
   NODE_ENV: z.preprocess(emptyToUndef, z.enum(['development', 'production', 'test']).default('development')),

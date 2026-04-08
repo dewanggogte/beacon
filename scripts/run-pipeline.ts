@@ -62,6 +62,16 @@ async function main() {
     });
   }
 
+  // Step 3: Sync to Neon (if configured)
+  if (process.env.NEON_DATABASE_URL) {
+    logger.info('\n=== Step 3: Syncing to Neon ===');
+    const { execSync } = await import('child_process');
+    execSync('npx tsx scripts/sync-to-neon.ts', {
+      stdio: 'inherit',
+      env: process.env as NodeJS.ProcessEnv,
+    });
+  }
+
   const elapsed = ((Date.now() - startTime) / 1000).toFixed(0);
   logger.info(`\n=== Pipeline Complete (${elapsed}s) ===`);
 }

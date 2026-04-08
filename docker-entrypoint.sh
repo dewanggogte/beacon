@@ -25,6 +25,10 @@ case "$MODE" in
     echo "Starting pipeline without LLM..."
     exec tsx scripts/run-pipeline.ts --skip-llm "$@"
     ;;
+  sync)
+    echo "Syncing database to Neon..."
+    exec tsx scripts/sync-to-neon.ts
+    ;;
   migrate)
     echo "Running database migrations..."
     cd packages/shared && exec npx drizzle-kit migrate
