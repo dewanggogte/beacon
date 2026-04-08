@@ -39,9 +39,64 @@ const TABLES_TO_SYNC = [
   'analysis_history',
 ] as const;
 
-// Batch size for inserts — avoids OOM on large tables and keeps
-// Neon's query size under its 64MB limit.
-const BATCH_SIZE = 500;
+// Batch size for reads AND inserts — fetch+insert this many rows at a time
+// to keep memory usage low (company_snapshots has large JSONB columns).
+const BATCH_SIZE = 200;
+
+function escapeValue(val: unknown): string {
+  if (val === null || val === undefined) return 'NULL';
+  if (val instanceof Date) return `'${val.toISOString()}'::timestamptz`;
+  if (typeof val === 'object') return `'${JSON.stringify(val).replace(/'/g, "''")}'::jsonb`;
+  if (typeof val === 'boolean') return val ? 'TRUE' : 'FALSE';
+  return `'${String(val).replace(/'/g, "''")}'`;
+}
+
+async function syncTable(
+  local: postgres.Sql,
+  tx: postgres.TransactionSql,
+  table: string,
+) {
+  // Get total count first (cheap query, no data loaded)
+  const [{ count }] = await local.unsafe(`SELECT count(*)::int as count FROM "${table}"`);
+
+  if (count === 0) {
+    logger.info(`${table}: 0 rows (skipped)`);
+    return;
+  }
+
+  let inserted = 0;
+  let lastId = 0;
+  let columns: string[] | null = null;
+
+  // Fetch and insert in small batches using keyset pagination on id
+  while (inserted < count) {
+    const batch = await local.unsafe(
+      `SELECT * FROM "${table}" WHERE id > ${lastId} ORDER BY id LIMIT ${BATCH_SIZE}`,
+    );
+
+    if (batch.length === 0) break;
+
+    if (!columns) columns = Object.keys(batch[0]);
+
+    const values = batch.map(
+      (row) => `(${columns!.map((col) => escapeValue(row[col])).join(', ')})`,
+    );
+
+    await tx.unsafe(
+      `INSERT INTO "${table}" (${columns.map((c) => `"${c}"`).join(', ')}) VALUES ${values.join(', ')}`,
+    );
+
+    lastId = batch[batch.length - 1].id;
+    inserted += batch.length;
+
+    // Log progress for large tables
+    if (count > BATCH_SIZE) {
+      logger.info(`${table}: ${inserted}/${count} rows...`);
+    }
+  }
+
+  logger.info(`${table}: ${inserted} rows synced`);
+}
 
 async function sync() {
   const startTime = Date.now();
@@ -66,42 +121,9 @@ async function sync() {
         logger.info(`Truncated ${table}`);
       }
 
-      // Copy each table
+      // Copy each table in batches (keyset pagination to stay memory-safe)
       for (const table of TABLES_TO_SYNC) {
-        const rows = await local.unsafe(`SELECT * FROM "${table}"`);
-        const count = rows.length;
-
-        if (count === 0) {
-          logger.info(`${table}: 0 rows (skipped)`);
-          continue;
-        }
-
-        // Insert in batches
-        const columns = Object.keys(rows[0]);
-        let inserted = 0;
-
-        for (let i = 0; i < count; i += BATCH_SIZE) {
-          const batch = rows.slice(i, i + BATCH_SIZE);
-          const values = batch.map(
-            (row) =>
-              `(${columns.map((col) => {
-                const val = row[col];
-                if (val === null || val === undefined) return 'NULL';
-                if (val instanceof Date) return `'${val.toISOString()}'::timestamptz`;
-                if (typeof val === 'object') return `'${JSON.stringify(val).replace(/'/g, "''")}'::jsonb`;
-                if (typeof val === 'boolean') return val ? 'TRUE' : 'FALSE';
-                // Escape single quotes in strings
-                return `'${String(val).replace(/'/g, "''")}'`;
-              }).join(', ')})`,
-          );
-
-          await tx.unsafe(
-            `INSERT INTO "${table}" (${columns.map((c) => `"${c}"`).join(', ')}) VALUES ${values.join(', ')}`,
-          );
-          inserted += batch.length;
-        }
-
-        logger.info(`${table}: ${inserted} rows synced`);
+        await syncTable(local, tx, table);
       }
 
       // Reset sequences so future inserts (if any) don't collide
