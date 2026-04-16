@@ -162,25 +162,46 @@ export async function getCompanyDetail(screenerCode: string) {
 
   const companyId = company[0]!.id;
 
-  // Fetch analysis and snapshot in parallel
-  const [analysisRows, snapshotRows] = await Promise.all([
-    db
-      .select()
-      .from(schema.analysisResults)
-      .where(eq(schema.analysisResults.companyId, companyId))
-      .orderBy(desc(schema.analysisResults.analyzedAt))
-      .limit(1),
-    db
-      .select()
-      .from(schema.companySnapshots)
-      .where(eq(schema.companySnapshots.companyId, companyId))
-      .orderBy(desc(schema.companySnapshots.scrapedAt))
-      .limit(1),
-  ]);
+  // Prefer analysis from an LLM run (classification_source = 'ag4'), fall back to latest
+  const llmAnalysis = await db
+    .select()
+    .from(schema.analysisResults)
+    .where(
+      and(
+        eq(schema.analysisResults.companyId, companyId),
+        eq(schema.analysisResults.classificationSource, 'ag4'),
+      ),
+    )
+    .orderBy(desc(schema.analysisResults.analyzedAt))
+    .limit(1);
+
+  const analysis = llmAnalysis[0] ?? (await db
+    .select()
+    .from(schema.analysisResults)
+    .where(eq(schema.analysisResults.companyId, companyId))
+    .orderBy(desc(schema.analysisResults.analyzedAt))
+    .limit(1)
+  )[0] ?? null;
+
+  // Fetch snapshot from the same run as the chosen analysis
+  const runId = analysis?.scrapeRunId;
+  const snapshotRows = await db
+    .select()
+    .from(schema.companySnapshots)
+    .where(
+      runId
+        ? and(
+            eq(schema.companySnapshots.companyId, companyId),
+            eq(schema.companySnapshots.scrapeRunId, runId),
+          )
+        : eq(schema.companySnapshots.companyId, companyId),
+    )
+    .orderBy(desc(schema.companySnapshots.scrapedAt))
+    .limit(1);
 
   return {
     company: company[0]!,
-    analysis: analysisRows[0] ?? null,
+    analysis,
     snapshot: snapshotRows[0] ?? null,
   };
 }
