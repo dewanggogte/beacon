@@ -142,7 +142,11 @@ export async function getAllRankings(runId: number) {
       ),
     )
     .where(eq(schema.analysisResults.scrapeRunId, runId))
-    .orderBy(desc(schema.analysisResults.finalScore));
+    .orderBy(
+      // LLM-evaluated companies rank above quant-only
+      sql`CASE WHEN ${schema.analysisResults.classificationSource} = 'ag4' THEN 0 ELSE 1 END`,
+      desc(schema.analysisResults.finalScore),
+    );
 
   return results;
 }
