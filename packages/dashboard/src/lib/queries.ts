@@ -2,6 +2,25 @@ import { db, schema } from '@screener/shared';
 import { desc, eq, sql, and, isNull, or, inArray } from 'drizzle-orm';
 
 export async function getLatestRunId(): Promise<number | null> {
+  // Prefer the latest run that has LLM evaluations (classification_source = 'ag4'),
+  // so quant-only runs (when LLM is off) don't become the default display.
+  const llmRuns = await db
+    .select({ id: schema.scrapeRuns.id })
+    .from(schema.scrapeRuns)
+    .innerJoin(
+      schema.analysisResults,
+      and(
+        eq(schema.analysisResults.scrapeRunId, schema.scrapeRuns.id),
+        eq(schema.analysisResults.classificationSource, 'ag4'),
+      ),
+    )
+    .where(eq(schema.scrapeRuns.status, 'completed'))
+    .orderBy(desc(schema.scrapeRuns.id))
+    .limit(1);
+
+  if (llmRuns[0]) return llmRuns[0].id;
+
+  // Fallback: latest completed run (even if quant-only)
   const runs = await db
     .select({ id: schema.scrapeRuns.id })
     .from(schema.scrapeRuns)
